@@ -1,0 +1,29 @@
+{
+  "name": "remote-attendance-system",
+  "version": "1.0.0",
+  "description": "A comprehensive remote employee attendance system with web and mobile support",
+  "main": "server/index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
+    "server:dev": "cd server && npm run dev",
+    "client:dev": "cd client && npm start",
+    "mobile:dev": "cd mobile && npm start",
+    "build": "npm run build:server && npm run build:client",
+    "build:server": "cd server && npm run build",
+    "build:client": "cd client && npm run build",
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install && cd ../mobile && npm install",
+    "start": "cd server && npm start"
+  },
+  "keywords": [
+    "attendance",
+    "remote-work",
+    "employee-management",
+    "leave-management",
+    "geolocation"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+} 
