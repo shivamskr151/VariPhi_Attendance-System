@@ -160,7 +160,9 @@ router.put('/change-password', passwordChangeValidation, authenticateToken, asyn
   }
 
   const { currentPassword, newPassword } = req.body;
-  const employee = req.employee;
+  
+  // Fetch employee with password field for comparison
+  const employee = await Employee.findById(req.employee._id);
 
   // Verify current password
   const isCurrentPasswordValid = await employee.comparePassword(currentPassword);
