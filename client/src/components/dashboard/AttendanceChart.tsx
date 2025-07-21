@@ -1,91 +1,255 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   Box,
   Typography,
   Paper,
   CircularProgress,
   useTheme,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  IconButton,
+  Tooltip,
+  Chip,
 } from '@mui/material';
+import {
+  ChevronLeft,
+  ChevronRight,
+  CalendarToday,
+  TrendingUp,
+  TrendingDown,
+} from '@mui/icons-material';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { getAttendanceHistory } from '../../store/slices/attendanceSlice';
 import { useAppDispatch } from '../../hooks/useAppDispatch';
 
-interface WeeklyData {
+interface ChartData {
   day: string;
   hours: number;
   status: string;
   date: string;
+  isToday: boolean;
+  isWeekend: boolean;
 }
+
+type TimeRange = 'week' | 'month' | 'quarter' | 'year';
 
 const AttendanceChart: React.FC = () => {
   const theme = useTheme();
   const dispatch = useAppDispatch();
-  const { attendanceHistory, loading } = useSelector((state: RootState) => state.attendance);
+  const { attendanceHistory, loading, summary } = useSelector((state: RootState) => state.attendance);
   const { user } = useSelector((state: RootState) => state.auth);
-  const [weeklyData, setWeeklyData] = useState<WeeklyData[]>([]);
+  
+  const [timeRange, setTimeRange] = useState<TimeRange>('week');
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [chartData, setChartData] = useState<ChartData[]>([]);
 
+  // Calculate date range based on selected time period
+  const { startDate, endDate, dateLabels } = useMemo(() => {
+    const today = new Date(currentDate);
+    let start: Date;
+    let end: Date = new Date(today);
+    let labels: string[] = [];
+
+    switch (timeRange) {
+      case 'week':
+        start = new Date(today);
+        start.setDate(today.getDate() - today.getDay()); // Start from Sunday
+        end = new Date(start);
+        end.setDate(start.getDate() + 6); // End on Saturday
+        labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        break;
+      
+      case 'month':
+        start = new Date(today.getFullYear(), today.getMonth(), 1);
+        end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        const daysInMonth = end.getDate();
+        labels = Array.from({ length: daysInMonth }, (_, i) => (i + 1).toString());
+        break;
+      
+      case 'quarter':
+        const quarter = Math.floor(today.getMonth() / 3);
+        start = new Date(today.getFullYear(), quarter * 3, 1);
+        end = new Date(today.getFullYear(), (quarter + 1) * 3, 0);
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        labels = months.slice(quarter * 3, (quarter + 1) * 3);
+        break;
+      
+      case 'year':
+        start = new Date(today.getFullYear(), 0, 1);
+        end = new Date(today.getFullYear(), 11, 31);
+        labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        break;
+      
+      default:
+        start = new Date(today);
+        start.setDate(today.getDate() - today.getDay());
+        end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    }
+
+    return {
+      startDate: start.toISOString().split('T')[0],
+      endDate: end.toISOString().split('T')[0],
+      dateLabels: labels,
+    };
+  }, [timeRange, currentDate]);
+
+  // Fetch attendance data when date range changes
   useEffect(() => {
     if (user) {
-      // Get attendance for the current week
-      const today = new Date();
-      const startOfWeek = new Date(today);
-      startOfWeek.setDate(today.getDate() - today.getDay()); // Start from Sunday
-      
-      const endDate = today.toISOString().split('T')[0];
-      const startDate = startOfWeek.toISOString().split('T')[0];
-      
       dispatch(getAttendanceHistory({ startDate, endDate }));
     }
-  }, [dispatch, user]);
+  }, [dispatch, user, startDate, endDate]);
 
+  // Process attendance data for chart
   useEffect(() => {
     if (attendanceHistory?.length > 0) {
-      // Process attendance data for the week
-      const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const today = new Date();
-      const startOfWeek = new Date(today);
-      startOfWeek.setDate(today.getDate() - today.getDay());
-      
-      const weekData: WeeklyData[] = daysOfWeek.map((day, index) => {
-        const date = new Date(startOfWeek);
-        date.setDate(startOfWeek.getDate() + index);
-        const dateStr = date.toISOString().split('T')[0];
+      const processedData: ChartData[] = [];
+
+      if (timeRange === 'week') {
+        // Weekly view - show each day of the week
+        const startOfWeek = new Date(currentDate);
+        startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
         
-        const attendance = attendanceHistory.find(a => a.date === dateStr);
+        dateLabels.forEach((label, index) => {
+          const date = new Date(startOfWeek);
+          date.setDate(startOfWeek.getDate() + index);
+          const dateStr = date.toISOString().split('T')[0];
+          
+          const attendance = attendanceHistory.find(a => a.date === dateStr);
+          const isToday = today.toDateString() === date.toDateString();
+          const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+          
+          processedData.push({
+            day: label,
+            hours: attendance?.totalHours || 0,
+            status: attendance?.status || 'absent',
+            date: dateStr,
+            isToday,
+            isWeekend,
+          });
+        });
+      } else if (timeRange === 'month') {
+        // Monthly view - show each day of the month
+        const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
         
-        return {
-          day,
-          hours: attendance?.totalHours || 0,
-          status: attendance?.status || 'absent',
-          date: dateStr,
-        };
-      });
+        dateLabels.forEach((day, index) => {
+          const date = new Date(startOfMonth);
+          date.setDate(parseInt(day));
+          const dateStr = date.toISOString().split('T')[0];
+          
+          const attendance = attendanceHistory.find(a => a.date === dateStr);
+          const isToday = today.toDateString() === date.toDateString();
+          const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+          
+          processedData.push({
+            day,
+            hours: attendance?.totalHours || 0,
+            status: attendance?.status || 'absent',
+            date: dateStr,
+            isToday,
+            isWeekend,
+          });
+        });
+      } else if (timeRange === 'quarter') {
+        // Quarterly view - show each month of the quarter
+        const quarter = Math.floor(currentDate.getMonth() / 3);
+        const startOfQuarter = new Date(currentDate.getFullYear(), quarter * 3, 1);
+        
+        dateLabels.forEach((month, index) => {
+          const monthDate = new Date(startOfQuarter);
+          monthDate.setMonth(startOfQuarter.getMonth() + index);
+          
+          // Calculate total hours for the month
+          const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+          const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+          
+          const monthAttendance = attendanceHistory.filter(a => {
+            const attendanceDate = new Date(a.date);
+            return attendanceDate >= monthStart && attendanceDate <= monthEnd;
+          });
+          
+          const totalHours = monthAttendance.reduce((sum, a) => sum + (a.totalHours || 0), 0);
+          const isCurrentMonth = monthDate.getMonth() === today.getMonth() && monthDate.getFullYear() === today.getFullYear();
+          
+          processedData.push({
+            day: month,
+            hours: totalHours,
+            status: monthAttendance.length > 0 ? 'present' : 'absent',
+            date: monthDate.toISOString().split('T')[0],
+            isToday: isCurrentMonth,
+            isWeekend: false,
+          });
+        });
+      } else if (timeRange === 'year') {
+        // Yearly view - show each month of the year
+        dateLabels.forEach((month, index) => {
+          const monthDate = new Date(currentDate.getFullYear(), index, 1);
+          
+          // Calculate total hours for the month
+          const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+          const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+          
+          const monthAttendance = attendanceHistory.filter(a => {
+            const attendanceDate = new Date(a.date);
+            return attendanceDate >= monthStart && attendanceDate <= monthEnd;
+          });
+          
+          const totalHours = monthAttendance.reduce((sum, a) => sum + (a.totalHours || 0), 0);
+          const isCurrentMonth = monthDate.getMonth() === today.getMonth() && monthDate.getFullYear() === today.getFullYear();
+          
+          processedData.push({
+            day: month,
+            hours: totalHours,
+            status: monthAttendance.length > 0 ? 'present' : 'absent',
+            date: monthDate.toISOString().split('T')[0],
+            isToday: isCurrentMonth,
+            isWeekend: false,
+          });
+        });
+      }
       
-      setWeeklyData(weekData);
+      setChartData(processedData);
     } else {
-      // Set default week data when no attendance history
-      const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      const today = new Date();
-      const startOfWeek = new Date(today);
-      startOfWeek.setDate(today.getDate() - today.getDay());
-      
-      const weekData: WeeklyData[] = daysOfWeek.map((day, index) => {
-        const date = new Date(startOfWeek);
-        date.setDate(startOfWeek.getDate() + index);
-        const dateStr = date.toISOString().split('T')[0];
+      // Set empty data when no attendance history
+      const emptyData: ChartData[] = dateLabels.map((label, index) => {
+        const today = new Date();
+        let date: Date;
+        
+        if (timeRange === 'week') {
+          const startOfWeek = new Date(currentDate);
+          startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+          date = new Date(startOfWeek);
+          date.setDate(startOfWeek.getDate() + index);
+        } else if (timeRange === 'month') {
+          const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+          date = new Date(startOfMonth);
+          date.setDate(parseInt(label));
+        } else {
+          date = new Date(currentDate.getFullYear(), index, 1);
+        }
+        
+        const isToday = today.toDateString() === date.toDateString();
+        const isWeekend = date.getDay() === 0 || date.getDay() === 6;
         
         return {
-          day,
+          day: label,
           hours: 0,
           status: 'absent',
-          date: dateStr,
+          date: date.toISOString().split('T')[0],
+          isToday,
+          isWeekend,
         };
       });
       
-      setWeeklyData(weekData);
+      setChartData(emptyData);
     }
-  }, [attendanceHistory]);
+  }, [attendanceHistory, timeRange, currentDate, dateLabels]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -97,14 +261,17 @@ const AttendanceChart: React.FC = () => {
         return theme.palette.error.main;
       case 'half-day':
         return theme.palette.info.main;
+      case 'leave':
+        return theme.palette.secondary.main;
       default:
         return theme.palette.grey[300];
     }
   };
 
   const getMaxHours = () => {
-    if (!weeklyData?.length) return 8;
-    return Math.max(...weeklyData.map(d => d.hours), 8); // Default to 8 hours if no data
+    if (!chartData?.length) return 8;
+    const maxHours = Math.max(...chartData.map(d => d.hours));
+    return maxHours > 0 ? maxHours : 8; // Default to 8 hours if no data
   };
 
   const formatHours = (hours: number) => {
@@ -114,11 +281,136 @@ const AttendanceChart: React.FC = () => {
     return minutes > 0 ? `${wholeHours}h ${minutes}m` : `${wholeHours}h`;
   };
 
+  const formatDateRange = () => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    if (timeRange === 'week') {
+      return `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`;
+    } else if (timeRange === 'month') {
+      return start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    } else if (timeRange === 'quarter') {
+      return `Q${Math.floor(start.getMonth() / 3) + 1} ${start.getFullYear()}`;
+    } else {
+      return start.getFullYear().toString();
+    }
+  };
+
+  const navigateDate = (direction: 'prev' | 'next') => {
+    const newDate = new Date(currentDate);
+    
+    switch (timeRange) {
+      case 'week':
+        newDate.setDate(currentDate.getDate() + (direction === 'next' ? 7 : -7));
+        break;
+      case 'month':
+        newDate.setMonth(currentDate.getMonth() + (direction === 'next' ? 1 : -1));
+        break;
+      case 'quarter':
+        newDate.setMonth(currentDate.getMonth() + (direction === 'next' ? 3 : -3));
+        break;
+      case 'year':
+        newDate.setFullYear(currentDate.getFullYear() + (direction === 'next' ? 1 : -1));
+        break;
+    }
+    
+    setCurrentDate(newDate);
+  };
+
+  const goToToday = () => {
+    setCurrentDate(new Date());
+  };
+
+  const getTotalHours = () => chartData?.reduce((sum, day) => sum + day.hours, 0) || 0;
+  const getAverageHours = () => {
+    const daysWithHours = chartData?.filter(d => d.hours > 0).length || 1;
+    return getTotalHours() / daysWithHours;
+  };
+
+  const getAttendanceRate = () => {
+    if (!chartData?.length) return 0;
+    const presentDays = chartData.filter(d => d.status === 'present').length;
+    return (presentDays / chartData.length) * 100;
+  };
+
+  const getStatusCounts = () => {
+    const counts: { [key: string]: number } = {};
+    chartData?.forEach(day => {
+      counts[day.status] = (counts[day.status] || 0) + 1;
+    });
+    return counts;
+  };
+
+  const statusCounts = getStatusCounts();
+
   return (
     <Box>
-      <Typography variant="body2" color="text.secondary" gutterBottom>
-        Weekly attendance overview
-      </Typography>
+      {/* Header with controls */}
+      <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+        <Box display="flex" alignItems="center" gap={2}>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>Time Range</InputLabel>
+            <Select
+              value={timeRange}
+              label="Time Range"
+              onChange={(e) => setTimeRange(e.target.value as TimeRange)}
+            >
+              <MenuItem value="week">Week</MenuItem>
+              <MenuItem value="month">Month</MenuItem>
+              <MenuItem value="quarter">Quarter</MenuItem>
+              <MenuItem value="year">Year</MenuItem>
+            </Select>
+          </FormControl>
+          
+          <Typography variant="body2" color="text.secondary">
+            {formatDateRange()}
+          </Typography>
+        </Box>
+        
+        <Box display="flex" alignItems="center" gap={1}>
+          <Tooltip title="Previous period">
+            <IconButton size="small" onClick={() => navigateDate('prev')}>
+              <ChevronLeft />
+            </IconButton>
+          </Tooltip>
+          
+          <Tooltip title="Go to today">
+            <IconButton size="small" onClick={goToToday}>
+              <CalendarToday />
+            </IconButton>
+          </Tooltip>
+          
+          <Tooltip title="Next period">
+            <IconButton size="small" onClick={() => navigateDate('next')}>
+              <ChevronRight />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      </Box>
+
+      {/* Summary stats */}
+      <Box display="flex" gap={2} mb={2} flexWrap="wrap">
+        <Chip 
+          icon={<TrendingUp />} 
+          label={`Total: ${formatHours(getTotalHours())}`} 
+          color="primary" 
+          variant="outlined" 
+          size="small" 
+        />
+        <Chip 
+          icon={<TrendingDown />} 
+          label={`Avg: ${formatHours(getAverageHours())}`} 
+          color="secondary" 
+          variant="outlined" 
+          size="small" 
+        />
+        <Chip 
+          label={`Rate: ${getAttendanceRate().toFixed(1)}%`} 
+          color={getAttendanceRate() >= 80 ? 'success' : getAttendanceRate() >= 60 ? 'warning' : 'error'} 
+          variant="outlined" 
+          size="small" 
+        />
+      </Box>
       
       {loading ? (
         <Box display="flex" justifyContent="center" py={4}>
@@ -126,25 +418,27 @@ const AttendanceChart: React.FC = () => {
         </Box>
       ) : (
         <>
+          {/* Chart */}
           <Box
             sx={{
               height: 200,
               display: 'flex',
               alignItems: 'flex-end',
-              gap: 1,
+              gap: timeRange === 'month' ? 0.5 : 1,
               mt: 2,
+              overflowX: timeRange === 'month' ? 'auto' : 'visible',
             }}
           >
-            {weeklyData?.map((dayData, index) => {
+            {chartData?.map((dayData, index) => {
               const maxHours = getMaxHours();
               const heightPercentage = maxHours > 0 ? (dayData.hours / maxHours) * 100 : 0;
-              const isToday = new Date().toDateString() === new Date(dayData.date).toDateString();
               
               return (
                 <Box
-                  key={dayData.day}
+                  key={`${dayData.day}-${index}`}
                   sx={{
-                    flex: 1,
+                    flex: timeRange === 'month' ? 'none' : 1,
+                    minWidth: timeRange === 'month' ? 20 : 'auto',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -155,24 +449,26 @@ const AttendanceChart: React.FC = () => {
                     sx={{
                       width: '100%',
                       height: `${Math.max(heightPercentage, 5)}%`,
-                      backgroundColor: getStatusColor(dayData.status),
+                      backgroundColor: dayData.isWeekend ? theme.palette.grey[400] : getStatusColor(dayData.status),
                       borderRadius: 1,
                       minHeight: 20,
                       position: 'relative',
-                      border: isToday ? `2px solid ${theme.palette.primary.main}` : 'none',
+                      border: dayData.isToday ? `2px solid ${theme.palette.primary.main}` : 'none',
+                      opacity: dayData.isWeekend ? 0.6 : 1,
                       '&:hover': {
                         opacity: 0.8,
                         cursor: 'pointer',
                       },
                     }}
-                    title={`${dayData.day}: ${formatHours(dayData.hours)} - ${dayData.status}`}
+                    title={`${dayData.day}: ${formatHours(dayData.hours)} - ${dayData.status}${dayData.isWeekend ? ' (Weekend)' : ''}`}
                   />
                   <Typography 
                     variant="caption" 
                     color="text.secondary"
                     sx={{ 
-                      fontWeight: isToday ? 'bold' : 'normal',
-                      color: isToday ? theme.palette.primary.main : 'text.secondary'
+                      fontWeight: dayData.isToday ? 'bold' : 'normal',
+                      color: dayData.isToday ? theme.palette.primary.main : 'text.secondary',
+                      fontSize: timeRange === 'month' ? '0.7rem' : '0.75rem',
                     }}
                   >
                     {dayData.day}
@@ -182,28 +478,22 @@ const AttendanceChart: React.FC = () => {
             })}
           </Box>
           
-          <Box display="flex" justifyContent="space-between" mt={2} px={1}>
-            <Typography variant="caption" color="text.secondary">
-              Total: {formatHours(weeklyData?.reduce((sum, day) => sum + day.hours, 0) || 0)}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Avg: {formatHours((weeklyData?.reduce((sum, day) => sum + day.hours, 0) || 0) / Math.max(weeklyData?.filter(d => d.hours > 0).length || 1, 1))}
-            </Typography>
-          </Box>
-          
-          <Box display="flex" justifyContent="center" gap={2} mt={2}>
-            <Box display="flex" alignItems="center" gap={0.5}>
-              <Box sx={{ width: 12, height: 12, backgroundColor: theme.palette.success.main, borderRadius: 1 }} />
-              <Typography variant="caption">Present</Typography>
-            </Box>
-            <Box display="flex" alignItems="center" gap={0.5}>
-              <Box sx={{ width: 12, height: 12, backgroundColor: theme.palette.warning.main, borderRadius: 1 }} />
-              <Typography variant="caption">Late</Typography>
-            </Box>
-            <Box display="flex" alignItems="center" gap={0.5}>
-              <Box sx={{ width: 12, height: 12, backgroundColor: theme.palette.error.main, borderRadius: 1 }} />
-              <Typography variant="caption">Absent</Typography>
-            </Box>
+          {/* Dynamic legend based on actual data */}
+          <Box display="flex" justifyContent="center" gap={2} mt={2} flexWrap="wrap">
+            {Object.entries(statusCounts).map(([status, count]) => (
+              <Box key={status} display="flex" alignItems="center" gap={0.5}>
+                <Box sx={{ width: 12, height: 12, backgroundColor: getStatusColor(status), borderRadius: 1 }} />
+                <Typography variant="caption" sx={{ textTransform: 'capitalize' }}>
+                  {status} ({count})
+                </Typography>
+              </Box>
+            ))}
+            {chartData?.some(d => d.isWeekend) && (
+              <Box display="flex" alignItems="center" gap={0.5}>
+                <Box sx={{ width: 12, height: 12, backgroundColor: theme.palette.grey[400], borderRadius: 1, opacity: 0.6 }} />
+                <Typography variant="caption">Weekend</Typography>
+              </Box>
+            )}
           </Box>
         </>
       )}

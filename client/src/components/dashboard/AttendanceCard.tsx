@@ -144,7 +144,7 @@ const AttendanceCard: React.FC = () => {
             <Box display="flex" alignItems="center" gap={1}>
               <Login color="success" />
               <Typography variant="body2">
-                Punch In: {formatTime(todayAttendance.punchIn)}
+                Punch In: {formatTime(todayAttendance.punchIn.time)}
               </Typography>
             </Box>
           )}
@@ -153,7 +153,7 @@ const AttendanceCard: React.FC = () => {
             <Box display="flex" alignItems="center" gap={1}>
               <Logout color="error" />
               <Typography variant="body2">
-                Punch Out: {formatTime(todayAttendance.punchOut)}
+                Punch Out: {formatTime(todayAttendance.punchOut.time)}
               </Typography>
             </Box>
           )}

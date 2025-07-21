@@ -249,8 +249,8 @@ router.put('/change-password', [
     .isLength({ min: 6 })
     .withMessage('Current password must be at least 6 characters long'),
   body('newPassword')
-    .isLength({ min: 6 })
-    .withMessage('New password must be at least 6 characters long')
+    .isLength({ min: 8 })
+    .withMessage('New password must be at least 8 characters long')
 ], authenticateToken, asyncHandler(async (req, res) => {
   // Check for validation errors
   const errors = validationResult(req);
@@ -260,8 +260,11 @@ router.put('/change-password', [
 
   const { currentPassword, newPassword } = req.body;
 
+  // Fetch employee with password field for comparison
+  const employee = await Employee.findById(req.employee._id);
+
   // Verify current password
-  const isCurrentPasswordValid = await req.employee.comparePassword(currentPassword);
+  const isCurrentPasswordValid = await employee.comparePassword(currentPassword);
   if (!isCurrentPasswordValid) {
     return res.status(400).json({
       success: false,
@@ -270,8 +273,8 @@ router.put('/change-password', [
   }
 
   // Update password
-  req.employee.password = newPassword;
-  await req.employee.save();
+  employee.password = newPassword;
+  await employee.save();
 
   res.json({
     success: true,

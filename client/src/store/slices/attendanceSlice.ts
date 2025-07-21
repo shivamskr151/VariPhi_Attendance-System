@@ -72,9 +72,29 @@ export const getAttendanceHistory = createAsyncThunk(
   'attendance/getHistory',
   async (filters: AttendanceFilter = {}, { rejectWithValue }) => {
     try {
+      console.log('Redux action - getAttendanceHistory called with filters:', filters);
+      console.log('Redux action - API URL:', '/attendance/history');
+      console.log('Redux action - Request params:', filters);
+      
       const response = await attendanceAPI.getHistory(filters);
+      console.log('Redux action - API response:', response.data);
+      console.log('Redux action - Response data structure:', {
+        success: response.data.success,
+        hasData: !!response.data.data,
+        attendanceCount: response.data.data?.attendance?.length || 0,
+        pagination: response.data.data?.pagination,
+        summary: response.data.data?.summary
+      });
+      
       return response.data.data;
     } catch (error: any) {
+      console.error('Redux action - Error in getAttendanceHistory:', error);
+      console.error('Redux action - Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        statusText: error.response?.statusText
+      });
       return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.message || 'Failed to get attendance history');
     }
   }
@@ -161,6 +181,12 @@ const attendanceSlice = createSlice({
         state.error = null;
       })
       .addCase(getAttendanceHistory.fulfilled, (state, action) => {
+        console.log('Redux reducer - getAttendanceHistory.fulfilled:', {
+          payload: action.payload,
+          attendanceCount: action.payload?.attendance?.length || 0,
+          pagination: action.payload?.pagination,
+          summary: action.payload?.summary
+        });
         state.loading = false;
         state.attendanceHistory = action.payload.attendance;
         state.pagination = action.payload.pagination;

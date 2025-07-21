@@ -65,7 +65,7 @@ import {
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { useAppDispatch } from '../../hooks/useAppDispatch';
-import { updateProfilePicture, checkAuthStatus } from '../../store/slices/authSlice';
+import { updateProfilePicture, checkAuthStatus, changePassword } from '../../store/slices/authSlice';
 import { User } from '../../types';
 import { api } from '../../services/api';
 import LoadingSpinner from '../common/LoadingSpinner';
@@ -204,20 +204,19 @@ const SettingsPage: React.FC = () => {
 
     setLoading(true);
     try {
-      const response = await api.put('/users/change-password', {
+      await dispatch(changePassword({
         currentPassword: securityForm.currentPassword,
         newPassword: securityForm.newPassword,
+      })).unwrap();
+      
+      setSuccess('Password changed successfully!');
+      setSecurityForm({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
       });
-      if (response.data.success) {
-        setSuccess('Password changed successfully!');
-        setSecurityForm({
-          currentPassword: '',
-          newPassword: '',
-          confirmPassword: '',
-        });
-      }
     } catch (error: any) {
-      setError(error.response?.data?.message || 'Failed to change password');
+      setError(error || 'Failed to change password');
     } finally {
       setLoading(false);
     }

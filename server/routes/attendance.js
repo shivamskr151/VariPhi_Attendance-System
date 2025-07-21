@@ -116,10 +116,20 @@ router.post('/punch-in', punchInValidation, authenticateToken, asyncHandler(asyn
     message: 'Punch in successful',
     data: {
       attendance: {
-        id: attendance._id,
-        punchInTime: attendance.punchIn.time,
-        location: attendance.punchIn.location,
-        device: attendance.punchIn.device
+        _id: attendance._id,
+        employee: attendance.employee,
+        date: attendance.date,
+        punchIn: attendance.punchIn,
+        punchOut: attendance.punchOut,
+        totalHours: attendance.totalHours,
+        status: attendance.status,
+        notes: attendance.notes,
+        isRemote: attendance.isRemote,
+        approvedBy: attendance.approvedBy,
+        approvedAt: attendance.approvedAt,
+        isApproved: attendance.isApproved,
+        createdAt: attendance.createdAt,
+        updatedAt: attendance.updatedAt
       }
     }
   });
@@ -182,12 +192,20 @@ router.post('/punch-out', punchOutValidation, authenticateToken, asyncHandler(as
     message: 'Punch out successful',
     data: {
       attendance: {
-        id: attendance._id,
-        punchInTime: attendance.punchIn.time,
-        punchOutTime: attendance.punchOut.time,
+        _id: attendance._id,
+        employee: attendance.employee,
+        date: attendance.date,
+        punchIn: attendance.punchIn,
+        punchOut: attendance.punchOut,
         totalHours: attendance.totalHours,
-        location: attendance.punchOut.location,
-        device: attendance.punchOut.device
+        status: attendance.status,
+        notes: attendance.notes,
+        isRemote: attendance.isRemote,
+        approvedBy: attendance.approvedBy,
+        approvedAt: attendance.approvedAt,
+        isApproved: attendance.isApproved,
+        createdAt: attendance.createdAt,
+        updatedAt: attendance.updatedAt
       }
     }
   });
@@ -228,11 +246,20 @@ router.get('/today', authenticateToken, asyncHandler(async (req, res) => {
         canPunchIn,
         canPunchOut,
         attendance: {
-          id: attendance._id,
-          punchInTime: attendance.punchIn?.time,
-          punchOutTime: attendance.punchOut?.time,
+          _id: attendance._id,
+          employee: attendance.employee,
+          date: attendance.date,
+          punchIn: attendance.punchIn,
+          punchOut: attendance.punchOut,
           totalHours: attendance.totalHours,
-          status: attendance.status
+          status: attendance.status,
+          notes: attendance.notes,
+          isRemote: attendance.isRemote,
+          approvedBy: attendance.approvedBy,
+          approvedAt: attendance.approvedAt,
+          isApproved: attendance.isApproved,
+          createdAt: attendance.createdAt,
+          updatedAt: attendance.updatedAt
         }
       }
     });
@@ -265,6 +292,7 @@ router.get('/history', historyValidation, authenticateToken, canAccessEmployee, 
 
     console.log('Fetching attendance history:', {
       targetEmployeeId,
+      targetEmployeeIdType: typeof targetEmployeeId,
       startDate,
       endDate,
       page,
@@ -274,16 +302,41 @@ router.get('/history', historyValidation, authenticateToken, canAccessEmployee, 
     // Set default date range if not provided
     const defaultStartDate = new Date();
     defaultStartDate.setDate(defaultStartDate.getDate() - 30); // Last 30 days
+    defaultStartDate.setHours(0, 0, 0, 0); // Start of day
+
+    // Handle date filtering properly
+    let queryStartDate, queryEndDate;
+    
+    if (startDate) {
+      queryStartDate = new Date(startDate);
+      queryStartDate.setHours(0, 0, 0, 0); // Start of day
+    } else {
+      queryStartDate = defaultStartDate;
+    }
+    
+    if (endDate) {
+      queryEndDate = new Date(endDate);
+      queryEndDate.setHours(23, 59, 59, 999); // End of day
+    } else {
+      queryEndDate = new Date();
+      queryEndDate.setHours(23, 59, 59, 999); // End of current day
+    }
 
     const query = {
       employee: targetEmployeeId,
       date: {
-        $gte: startDate ? new Date(startDate) : defaultStartDate,
-        $lte: endDate ? new Date(endDate) : new Date()
+        $gte: queryStartDate,
+        $lte: queryEndDate
       }
     };
 
     console.log('Query:', JSON.stringify(query, null, 2));
+    console.log('Date range:', {
+      startDate: startDate,
+      endDate: endDate,
+      queryStartDate: queryStartDate.toISOString(),
+      queryEndDate: queryEndDate.toISOString()
+    });
 
     // Calculate pagination
     const skip = (page - 1) * limit;
@@ -296,6 +349,14 @@ router.get('/history', historyValidation, authenticateToken, canAccessEmployee, 
       .limit(parseInt(limit));
 
     console.log(`Found ${attendance.length} attendance records`);
+    if (attendance.length > 0) {
+      console.log('Sample attendance records:', attendance.map(a => ({
+        id: a._id,
+        employee: a.employee,
+        date: a.date,
+        status: a.status
+      })));
+    }
 
     // Get total count
     const total = await Attendance.countDocuments(query);

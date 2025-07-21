@@ -85,11 +85,42 @@ export interface Attendance {
 
 // Current Attendance Response Type (from /attendance/today endpoint)
 export interface CurrentAttendance {
-  id: string;
-  punchInTime?: string;
-  punchOutTime?: string;
+  _id: string;
+  employee: string | User;
+  date: string;
+  punchIn?: {
+    time: string;
+    location: {
+      latitude: number;
+      longitude: number;
+      address?: string;
+      accuracy?: number;
+    };
+    device: 'web' | 'mobile' | 'tablet';
+    ipAddress?: string;
+    userAgent?: string;
+  };
+  punchOut?: {
+    time: string;
+    location: {
+      latitude: number;
+      longitude: number;
+      address?: string;
+      accuracy?: number;
+    };
+    device: 'web' | 'mobile' | 'tablet';
+    ipAddress?: string;
+    userAgent?: string;
+  };
   totalHours: number;
   status: 'present' | 'absent' | 'late' | 'half-day' | 'leave';
+  notes?: string;
+  isRemote: boolean;
+  approvedBy?: string | User;
+  approvedAt?: string;
+  isApproved: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Leave Types

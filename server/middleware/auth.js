@@ -83,7 +83,7 @@ const requireManager = (req, res, next) => {
 
 // Middleware to check if user can access employee data
 const canAccessEmployee = async (req, res, next) => {
-  const targetEmployeeId = req.params.employeeId || req.body.employeeId;
+  const targetEmployeeId = req.params.employeeId || req.body.employeeId || req.query.employeeId;
   
   if (!targetEmployeeId) {
     return next();

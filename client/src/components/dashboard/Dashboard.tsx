@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Grid,
   Card,
@@ -6,7 +6,6 @@ import {
   Typography,
   Box,
   Paper,
-  useTheme,
   Chip,
   IconButton,
   Tooltip,
@@ -18,8 +17,6 @@ import {
   TrendingUp,
   AccessTime,
   CheckCircle,
-  Cancel,
-  Warning,
   Refresh,
   Work,
   Weekend,
@@ -38,7 +35,6 @@ import RecentActivityCard from './RecentActivityCard';
 import AttendanceChart from './AttendanceChart';
 
 const Dashboard: React.FC = () => {
-  const theme = useTheme();
   const dispatch = useAppDispatch();
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
@@ -48,33 +44,7 @@ const Dashboard: React.FC = () => {
   const { currentEmployee, teamMembers, loading: employeeLoading, error: employeeError } = useSelector((state: RootState) => state.employee);
   const { leaves, loading: leaveLoading } = useSelector((state: RootState) => state.leave);
 
-  useEffect(() => {
-    if (user) {
-      refreshDashboard();
-    }
-  }, [user]);
-
-  // Real-time clock update
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  // Auto-refresh dashboard data every 5 minutes
-  useEffect(() => {
-    if (!user) return;
-    
-    const refreshTimer = setInterval(() => {
-      refreshDashboard();
-    }, 5 * 60 * 1000); // 5 minutes
-
-    return () => clearInterval(refreshTimer);
-  }, [user]);
-
-  const refreshDashboard = async () => {
+  const refreshDashboard = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -95,7 +65,33 @@ const Dashboard: React.FC = () => {
     } catch (error) {
       console.error('Error refreshing dashboard:', error);
     }
-  };
+  }, [user, dispatch]);
+
+  useEffect(() => {
+    if (user) {
+      refreshDashboard();
+    }
+  }, [user, refreshDashboard]);
+
+  // Real-time clock update
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Auto-refresh dashboard data every 5 minutes
+  useEffect(() => {
+    if (!user) return;
+    
+    const refreshTimer = setInterval(() => {
+      refreshDashboard();
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(refreshTimer);
+  }, [user, refreshDashboard]);
 
   const loading = authLoading || attendanceLoading || employeeLoading || leaveLoading;
   const error = attendanceError || employeeError;
@@ -385,9 +381,6 @@ const Dashboard: React.FC = () => {
             {/* Attendance Chart */}
             <Grid item xs={12}>
               <Paper sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom>
-                  Attendance Overview
-                </Typography>
                 <AttendanceChart />
               </Paper>
             </Grid>

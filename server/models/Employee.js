@@ -153,7 +153,17 @@ employeeSchema.pre('save', async function(next) {
 
 // Method to compare password
 employeeSchema.methods.comparePassword = async function(candidatePassword) {
-  return bcrypt.compare(candidatePassword, this.password);
+  // Add validation to prevent undefined arguments
+  if (!candidatePassword || !this.password) {
+    return false;
+  }
+  
+  try {
+    return await bcrypt.compare(candidatePassword, this.password);
+  } catch (error) {
+    console.error('bcrypt.compare error:', error);
+    return false;
+  }
 };
 
 // Method to get public profile (without sensitive data)
