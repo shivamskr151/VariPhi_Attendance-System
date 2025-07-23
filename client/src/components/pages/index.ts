@@ -5,4 +5,6 @@ export { default as EmployeesPage } from './EmployeesPage';
 export { default as ReportsPage } from './ReportsPage';
 export { default as AdminPanelPage } from './AdminPanelPage';
 export { default as SettingsPage } from './SettingsPage';
-export { default as ProfilePage } from './ProfilePage'; 
+export { default as ProfilePage } from './ProfilePage';
+export { default as InvitationManagementPage } from './InvitationManagementPage';
+export { default as AcceptInvitationPage } from './AcceptInvitationPage'; 

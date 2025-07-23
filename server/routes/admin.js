@@ -3,8 +3,11 @@ const { query, validationResult } = require('express-validator');
 const Employee = require('../models/Employee');
 const Attendance = require('../models/Attendance');
 const Leave = require('../models/Leave');
+const SecuritySettings = require('../models/SecuritySettings');
+const SecurityAuditLog = require('../models/SecurityAuditLog');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const { asyncHandler, ValidationError } = require('../middleware/errorHandler');
+const { getSystemMetrics } = require('../middleware/systemMonitor');
 
 const router = express.Router();
 
@@ -567,6 +570,9 @@ router.get('/system-stats', authenticateToken, requireAdmin, asyncHandler(async 
     { $sort: { count: -1 } }
   ]);
 
+  // Get real-time system health metrics
+  const systemMetrics = getSystemMetrics();
+
   res.json({
     success: true,
     data: {
@@ -588,8 +594,30 @@ router.get('/system-stats', authenticateToken, requireAdmin, asyncHandler(async 
       breakdown: {
         departments: departmentStats,
         roles: roleStats
+      },
+      systemHealth: {
+        status: systemMetrics.health,
+        cpu: systemMetrics.cpu,
+        memory: systemMetrics.memory,
+        storage: systemMetrics.storage,
+        database: systemMetrics.database,
+        application: systemMetrics.application,
+        system: systemMetrics.system,
+        timestamp: systemMetrics.timestamp
       }
     }
+  });
+}));
+
+// @route   GET /api/admin/system-health
+// @desc    Get real-time system health metrics
+// @access  Private (Admin only)
+router.get('/system-health', authenticateToken, requireAdmin, asyncHandler(async (req, res) => {
+  const systemMetrics = getSystemMetrics();
+  
+  res.json({
+    success: true,
+    data: systemMetrics
   });
 }));
 
@@ -969,6 +997,81 @@ router.put('/settings', authenticateToken, requireAdmin, asyncHandler(async (req
   });
 }));
 
+// @route   GET /api/admin/security-settings
+// @desc    Get security settings
+// @access  Private (Admin only)
+router.get('/security-settings', authenticateToken, requireAdmin, asyncHandler(async (req, res) => {
+  try {
+    let securitySettings = await SecuritySettings.findOne();
+    
+    if (!securitySettings) {
+      // Create default settings if none exist
+      securitySettings = new SecuritySettings();
+      await securitySettings.save();
+    }
+
+    res.json({
+      success: true,
+      data: securitySettings
+    });
+  } catch (error) {
+    console.error('Error fetching security settings:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch security settings'
+    });
+  }
+}));
+
+// @route   PUT /api/admin/security-settings
+// @desc    Update security settings
+// @access  Private (Admin only)
+router.put('/security-settings', authenticateToken, requireAdmin, asyncHandler(async (req, res) => {
+  try {
+    let securitySettings = await SecuritySettings.findOne();
+    
+    if (!securitySettings) {
+      securitySettings = new SecuritySettings();
+    }
+
+    // Update settings with validation
+    Object.keys(req.body).forEach(key => {
+      if (securitySettings.schema.paths[key]) {
+        securitySettings[key] = req.body[key];
+      }
+    });
+
+    await securitySettings.save();
+
+    // Log the security settings change
+    const { logAdminAction } = require('../middleware/security');
+    await logAdminAction(req, 'SECURITY_SETTINGS_CHANGED', { 
+      changes: req.body,
+      settingsId: securitySettings._id 
+    });
+
+    res.json({
+      success: true,
+      message: 'Security settings updated successfully',
+      data: securitySettings
+    });
+  } catch (error) {
+    console.error('Error updating security settings:', error);
+    
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error: ' + Object.values(error.errors).map(e => e.message).join(', ')
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update security settings'
+    });
+  }
+}));
+
 // @route   POST /api/admin/backup
 // @desc    Create system backup
 // @access  Private (Admin only)
@@ -999,6 +1102,33 @@ router.post('/restore', authenticateToken, requireAdmin, asyncHandler(async (req
       timestamp: new Date().toISOString()
     }
   });
+}));
+
+// @route   GET /api/admin/security-audit-log
+// @desc    Get security audit log
+// @access  Private (Admin only)
+router.get('/security-audit-log', authenticateToken, requireAdmin, asyncHandler(async (req, res) => {
+  try {
+    const { limit = 50, eventType, severity, userId } = req.query;
+    
+    const filters = {};
+    if (eventType) filters.eventType = eventType;
+    if (severity) filters.severity = severity;
+    if (userId) filters.userId = userId;
+    
+    const auditLogs = await SecurityAuditLog.getRecentEvents(parseInt(limit), filters);
+    
+    res.json({
+      success: true,
+      data: auditLogs
+    });
+  } catch (error) {
+    console.error('Error fetching security audit log:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch security audit log'
+    });
+  }
 }));
 
 module.exports = router; 

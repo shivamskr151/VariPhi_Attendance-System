@@ -35,51 +35,97 @@ const validateCoordinates = (latitude, longitude) => {
 const validateLocation = async (location) => {
   const { latitude, longitude } = location;
 
-  // Check if location validation is enabled
-  const locationValidationEnabled = process.env.LOCATION_VALIDATION_ENABLED === 'true';
-  
-  if (!locationValidationEnabled) {
-    console.log('Location validation disabled - allowing all locations');
+  try {
+    // Try to get configuration from database first
+    const SystemConfig = require('../models/SystemConfig');
+    const config = await SystemConfig.getConfig();
+    
+    // Check if location validation is enabled
+    const locationValidationEnabled = config.locationValidation.enabled;
+    
+    if (!locationValidationEnabled) {
+      console.log('Location validation disabled - allowing all locations');
+      return {
+        isValid: true,
+        distance: '0.00',
+        message: 'Location validation disabled'
+      };
+    }
+
+    // Validate coordinates
+    const coordinateValidation = validateCoordinates(latitude, longitude);
+    if (!coordinateValidation.isValid) {
+      return coordinateValidation;
+    }
+
+    // Get company office location from database
+    const officeLat = config.officeLocation.latitude;
+    const officeLon = config.officeLocation.longitude;
+    const maxDistance = config.locationValidation.maxDistanceKm;
+
+    // Calculate distance from office
+    const distance = calculateDistance(latitude, longitude, officeLat, officeLon);
+
+    // Log debugging information
+    console.log('Location validation:', {
+      userLocation: { latitude, longitude },
+      officeLocation: { latitude: officeLat, longitude: officeLon },
+      calculatedDistance: distance.toFixed(2),
+      maxAllowedDistance: maxDistance
+    });
+
+    if (distance > maxDistance) {
+      return {
+        isValid: false,
+        message: `Location is too far from office. Maximum allowed distance is ${maxDistance}km. Current distance: ${distance.toFixed(2)}km. Please update office location in configuration or contact administrator.`
+      };
+    }
+
     return {
       isValid: true,
-      distance: '0.00',
-      message: 'Location validation disabled'
+      distance: distance.toFixed(2)
     };
-  }
+  } catch (error) {
+    console.error('Error getting system configuration:', error);
+    
+    // Fallback to environment variables if database fails
+    const locationValidationEnabled = process.env.LOCATION_VALIDATION_ENABLED === 'true';
+    
+    if (!locationValidationEnabled) {
+      console.log('Location validation disabled (fallback) - allowing all locations');
+      return {
+        isValid: true,
+        distance: '0.00',
+        message: 'Location validation disabled'
+      };
+    }
 
-  // Validate coordinates
-  const coordinateValidation = validateCoordinates(latitude, longitude);
-  if (!coordinateValidation.isValid) {
-    return coordinateValidation;
-  }
+    // Validate coordinates
+    const coordinateValidation = validateCoordinates(latitude, longitude);
+    if (!coordinateValidation.isValid) {
+      return coordinateValidation;
+    }
 
-  // Get company office location from environment variables
-  const officeLat = parseFloat(process.env.DEFAULT_LOCATION_LAT) || 51.5074;
-  const officeLon = parseFloat(process.env.DEFAULT_LOCATION_LNG) || -0.1278;
-  const maxDistance = parseFloat(process.env.MAX_DISTANCE_KM) || 100;
+    // Get company office location from environment variables
+    const officeLat = parseFloat(process.env.DEFAULT_LOCATION_LAT) || 0;
+    const officeLon = parseFloat(process.env.DEFAULT_LOCATION_LNG) || 0;
+    const maxDistance = parseFloat(process.env.MAX_DISTANCE_KM) || 100;
 
-  // Calculate distance from office
-  const distance = calculateDistance(latitude, longitude, officeLat, officeLon);
+    // Calculate distance from office
+    const distance = calculateDistance(latitude, longitude, officeLat, officeLon);
 
-  // Log debugging information
-  console.log('Location validation:', {
-    userLocation: { latitude, longitude },
-    officeLocation: { latitude: officeLat, longitude: officeLon },
-    calculatedDistance: distance.toFixed(2),
-    maxAllowedDistance: maxDistance
-  });
+    if (distance > maxDistance) {
+      return {
+        isValid: false,
+        message: `Location is too far from office. Maximum allowed distance is ${maxDistance}km. Current distance: ${distance.toFixed(2)}km. Please update office location in configuration or contact administrator.`
+      };
+    }
 
-  if (distance > maxDistance) {
     return {
-      isValid: false,
-      message: `Location is too far from office. Maximum allowed distance is ${maxDistance}km. Current distance: ${distance.toFixed(2)}km. Please update office location in configuration or contact administrator.`
+      isValid: true,
+      distance: distance.toFixed(2)
     };
   }
-
-  return {
-    isValid: true,
-    distance: distance.toFixed(2)
-  };
 };
 
 // Get address from coordinates using reverse geocoding

@@ -5,6 +5,7 @@ interface SocketState {
   connecting: boolean;
   error: string | null;
   socket: any | null;
+  systemHealth: any | null;
 }
 
 const initialState: SocketState = {
@@ -12,6 +13,7 @@ const initialState: SocketState = {
   connecting: false,
   error: null,
   socket: null,
+  systemHealth: null,
 };
 
 const socketSlice = createSlice({
@@ -46,6 +48,9 @@ const socketSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    updateSystemHealth: (state, action: PayloadAction<any>) => {
+      state.systemHealth = action.payload;
+    },
   },
 });
 
@@ -56,6 +61,7 @@ export const {
   disconnect,
   setError,
   clearError,
+  updateSystemHealth,
 } = socketSlice.actions;
 
 export default socketSlice.reducer; 

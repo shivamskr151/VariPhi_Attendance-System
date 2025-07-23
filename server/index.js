@@ -18,9 +18,13 @@ const employeeRoutes = require('./routes/employees');
 const adminRoutes = require('./routes/admin');
 const userRoutes = require('./routes/users');
 const reportRoutes = require('./routes/reports');
+const invitationRoutes = require('./routes/invitations');
+const configRoutes = require('./routes/config');
 const { authenticateToken } = require('./middleware/auth');
 const { errorHandler } = require('./middleware/errorHandler');
+const { trackRequest, trackError, getSystemMetrics } = require('./middleware/systemMonitor');
 const socketHandler = require('./services/socketHandler');
+const { emitSystemHealthUpdate } = require('./services/socketHandler');
 
 const app = express();
 const server = createServer(app);
@@ -56,6 +60,9 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// System monitoring middleware
+app.use(trackRequest);
+
 // Database connection
 mongoose.connect(process.env.MONGODB_URI || process.env.MONGODB_URI_PROD)
 .then(() => console.log('Connected to MongoDB'))
@@ -69,6 +76,8 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/invitations', invitationRoutes);
+app.use('/api/config', configRoutes);
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -88,7 +97,14 @@ io.on('connection', (socket) => {
   socketHandler(io, socket);
 });
 
+// Emit system health updates every 10 seconds to admin users
+setInterval(() => {
+  const systemMetrics = getSystemMetrics();
+  emitSystemHealthUpdate(io, systemMetrics);
+}, 10000);
+
 // Error handling middleware
+app.use(trackError);
 app.use(errorHandler);
 
 // 404 handler

@@ -315,12 +315,29 @@ router.post('/forgot-password', [
   employee.passwordResetExpires = Date.now() + 3600000; // 1 hour
   await employee.save();
 
-  // TODO: Send email with reset link
-  // For now, just return success
-  res.json({
-    success: true,
-    message: 'If the email exists, a password reset link has been sent'
-  });
+  // Send email with reset link
+  try {
+    const emailService = require('../services/emailService');
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const emailResult = await emailService.sendPasswordResetEmail(employee, resetToken, baseUrl);
+    
+    const message = emailResult.status === 'skipped' 
+      ? 'If the email exists, a password reset link has been generated (email not configured)'
+      : emailResult.status === 'failed'
+      ? 'If the email exists, a password reset link has been generated (email failed to send)'
+      : 'If the email exists, a password reset link has been sent';
+    
+    res.json({
+      success: true,
+      message: message
+    });
+  } catch (error) {
+    console.error('Failed to send password reset email:', error);
+    res.json({
+      success: true,
+      message: 'If the email exists, a password reset link has been generated'
+    });
+  }
 }));
 
 module.exports = router; 

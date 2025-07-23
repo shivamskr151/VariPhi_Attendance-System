@@ -25,6 +25,7 @@ import {
   MenuItem,
   Alert,
   CircularProgress,
+  LinearProgress,
   Tabs,
   Tab,
   Divider,
@@ -85,12 +86,14 @@ import {
   Person,
   LocationOn,
   Save,
+  Info,
 } from '@mui/icons-material';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { useAppDispatch } from '../../hooks/useAppDispatch';
 import { User } from '../../types';
 import { adminAPI } from '../../services/api';
+import { updateSystemHealth } from '../../store/slices/socketSlice';
 import LoadingSpinner from '../common/LoadingSpinner';
 import ErrorAlert from '../common/ErrorAlert';
 
@@ -118,6 +121,8 @@ function TabPanel(props: TabPanelProps) {
 
 const AdminPanelPage: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.auth);
+  const { socket, systemHealth } = useSelector((state: RootState) => state.socket);
+  const dispatch = useAppDispatch();
 
   const [tabValue, setTabValue] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -164,44 +169,141 @@ const AdminPanelPage: React.FC = () => {
     timezone: 'UTC',
   });
 
-  // Office Location States
-  const [officeLocation, setOfficeLocation] = useState({
-    latitude: 51.5074,
-    longitude: -0.1278,
-    maxDistance: 100,
-    locationValidationEnabled: true,
+  // Security Settings States
+  const [securitySettings, setSecuritySettings] = useState({
+    twoFactorAuth: false,
+    passwordPolicy: true,
+    sessionTimeout: 30,
+    maxLoginAttempts: 5,
+    passwordExpiry: 90,
+    requireStrongPasswords: true,
+    lockoutDuration: 15,
+    enableAuditLog: true,
   });
-  const [locationLoading, setLocationLoading] = useState(false);
+
+  // Security Audit Log States
+  const [auditLogs, setAuditLogs] = useState([]);
+
+  // System Configuration States
+  const [systemConfig, setSystemConfig] = useState({
+    officeLocation: {
+      latitude: 0,
+      longitude: 0,
+      address: 'Office Address',
+      city: 'City',
+      state: 'State',
+      country: 'Country'
+    },
+    locationValidation: {
+      enabled: false,
+      maxDistanceKm: 100,
+      allowRemoteWork: true
+    },
+    workingHours: {
+      startTime: '09:00',
+      endTime: '17:00',
+      timezone: 'UTC'
+    },
+    systemName: 'Attendance System',
+    systemVersion: '1.0.0'
+  });
+  const [configLoading, setConfigLoading] = useState(false);
 
   useEffect(() => {
     if (user?.role === 'admin') {
       fetchSystemStats();
       fetchUsers();
       fetchSystemSettings();
-      fetchOfficeLocation();
+      fetchSecuritySettings();
+      fetchAuditLogs();
+      fetchSystemConfig();
     }
   }, [user?.role]);
+
+  // Real-time system health updates
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      // Initial fetch
+      fetchSystemHealth();
+      
+      // Set up interval for real-time updates (every 10 seconds)
+      const healthInterval = setInterval(() => {
+        fetchSystemHealth();
+      }, 10000);
+
+      return () => clearInterval(healthInterval);
+    }
+  }, [user?.role]);
+
+  // WebSocket system health updates
+  useEffect(() => {
+    if (socket && user?.role === 'admin') {
+      // Join system health monitoring room
+      socket.emit('request_system_health', { role: user.role });
+      
+      // Listen for system health updates
+      socket.on('system_health_update', (data: any) => {
+        if (data.type === 'system_health_update') {
+          dispatch(updateSystemHealth(data.data));
+          
+          // Update local state with WebSocket data
+          setSystemStats(prev => ({
+            ...prev,
+            systemHealth: data.data.health || 'good',
+            storageUsage: data.data.storage || 0,
+            memoryUsage: data.data.memory || 0,
+            cpuUsage: data.data.cpu || 0,
+          }));
+        }
+      });
+
+      return () => {
+        socket.off('system_health_update');
+      };
+    }
+  }, [socket, user?.role, dispatch]);
 
   const fetchSystemStats = async () => {
     try {
       const response = await adminAPI.getSystemStats();
       if (response.data.success) {
         const data = response.data.data;
+        const systemHealth = data.systemHealth;
+        
         setSystemStats({
           totalUsers: data.overview?.totalEmployees || 0,
           activeUsers: data.overview?.totalEmployees || 0, // Assuming all employees are active for now
           totalAttendance: data.overview?.totalAttendanceRecords || 0,
           pendingLeaves: data.overview?.pendingLeaves || 0,
-          systemHealth: 'good', // Default to good since backend doesn't provide this
-          storageUsage: 0, // Backend doesn't provide this yet
-          memoryUsage: 0, // Backend doesn't provide this yet
-          cpuUsage: 0, // Backend doesn't provide this yet
+          systemHealth: systemHealth?.status || 'good',
+          storageUsage: systemHealth?.storage || 0,
+          memoryUsage: systemHealth?.memory || 0,
+          cpuUsage: systemHealth?.cpu || 0,
         });
       } else {
         setSystemStats(prev => ({ ...prev, systemHealth: 'warning' }));
       }
     } catch (error: any) {
       setError(error.response?.data?.message || 'Failed to fetch system stats');
+      setSystemStats(prev => ({ ...prev, systemHealth: 'critical' }));
+    }
+  };
+
+  const fetchSystemHealth = async () => {
+    try {
+      const response = await adminAPI.getSystemHealth();
+      if (response.data.success) {
+        const data = response.data.data;
+        setSystemStats(prev => ({
+          ...prev,
+          systemHealth: data.health || 'good',
+          storageUsage: data.storage || 0,
+          memoryUsage: data.memory || 0,
+          cpuUsage: data.cpu || 0,
+        }));
+      }
+    } catch (error: any) {
+      console.error('Failed to fetch system health:', error);
       setSystemStats(prev => ({ ...prev, systemHealth: 'critical' }));
     }
   };
@@ -245,32 +347,32 @@ const AdminPanelPage: React.FC = () => {
     }
   };
 
-  const fetchOfficeLocation = async () => {
+  const fetchSystemConfig = async () => {
     try {
-      setLocationLoading(true);
-      const response = await adminAPI.getOfficeLocation();
+      setConfigLoading(true);
+      const response = await adminAPI.getSystemConfig();
       if (response.data.success) {
-        setOfficeLocation(response.data.data);
+        setSystemConfig(response.data.data);
       }
     } catch (error: any) {
-      setError(error.response?.data?.message || 'Failed to fetch office location');
+      setError(error.response?.data?.message || 'Failed to fetch system configuration');
     } finally {
-      setLocationLoading(false);
+      setConfigLoading(false);
     }
   };
 
-  const updateOfficeLocation = async (locationData: any) => {
+  const updateSystemConfig = async (configData: any) => {
     try {
-      setLocationLoading(true);
-      const response = await adminAPI.updateOfficeLocation(locationData);
+      setConfigLoading(true);
+      const response = await adminAPI.updateSystemConfig(configData);
       if (response.data.success) {
-        setOfficeLocation(response.data.data);
-        setSuccess('Office location updated successfully');
+        setSystemConfig(response.data.data);
+        setSuccess('System configuration updated successfully');
       }
     } catch (error: any) {
-      setError(error.response?.data?.message || 'Failed to update office location');
+      setError(error.response?.data?.message || 'Failed to update system configuration');
     } finally {
-      setLocationLoading(false);
+      setConfigLoading(false);
     }
   };
 
@@ -350,6 +452,39 @@ const AdminPanelPage: React.FC = () => {
       }
     } catch (error: any) {
       setError(error.response?.data?.message || 'Failed to update system settings');
+    }
+  };
+
+  const handleUpdateSecuritySettings = async () => {
+    try {
+      const response = await adminAPI.updateSecuritySettings(securitySettings);
+      if (response.data.success) {
+        setSuccess('Security settings updated successfully!');
+      }
+    } catch (error: any) {
+      setError(error.response?.data?.message || 'Failed to update security settings');
+    }
+  };
+
+  const fetchSecuritySettings = async () => {
+    try {
+      const response = await adminAPI.getSecuritySettings();
+      if (response.data.success) {
+        setSecuritySettings(response.data.data);
+      }
+    } catch (error: any) {
+      setError(error.response?.data?.message || 'Failed to fetch security settings');
+    }
+  };
+
+  const fetchAuditLogs = async () => {
+    try {
+      const response = await adminAPI.getSecurityAuditLog({ limit: 10 });
+      if (response.data.success) {
+        setAuditLogs(response.data.data);
+      }
+    } catch (error: any) {
+      console.error('Failed to fetch audit logs:', error);
     }
   };
 
@@ -562,43 +697,80 @@ const AdminPanelPage: React.FC = () => {
       {/* System Health */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Typography variant="h6" gutterBottom>
-            System Health
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6">
+              System Health
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                Last updated:
+              </Typography>
+              <Typography variant="body2" color="primary.main">
+                {systemHealth?.timestamp ? new Date(systemHealth.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString()}
+              </Typography>
+            </Box>
+          </Box>
           <Grid container spacing={3}>
             <Grid item xs={12} md={3}>
               <Box sx={{ textAlign: 'center' }}>
                 {getSystemHealthChip(systemStats.systemHealth)}
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  Overall Status
+                </Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={3}>
               <Box sx={{ textAlign: 'center' }}>
                 <Typography variant="h6" color="primary.main">
-                  {systemStats.storageUsage}%
+                  {systemStats.storageUsage.toFixed(1)}%
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Storage Usage
                 </Typography>
+                <Box sx={{ mt: 1 }}>
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={systemStats.storageUsage} 
+                    color={systemStats.storageUsage > 80 ? 'error' : systemStats.storageUsage > 60 ? 'warning' : 'primary'}
+                    sx={{ height: 6, borderRadius: 3 }}
+                  />
+                </Box>
               </Box>
             </Grid>
             <Grid item xs={12} md={3}>
               <Box sx={{ textAlign: 'center' }}>
                 <Typography variant="h6" color="info.main">
-                  {systemStats.memoryUsage}%
+                  {systemStats.memoryUsage.toFixed(1)}%
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Memory Usage
                 </Typography>
+                <Box sx={{ mt: 1 }}>
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={systemStats.memoryUsage} 
+                    color={systemStats.memoryUsage > 80 ? 'error' : systemStats.memoryUsage > 60 ? 'warning' : 'info'}
+                    sx={{ height: 6, borderRadius: 3 }}
+                  />
+                </Box>
               </Box>
             </Grid>
             <Grid item xs={12} md={3}>
               <Box sx={{ textAlign: 'center' }}>
                 <Typography variant="h6" color="success.main">
-                  {systemStats.cpuUsage}%
+                  {systemStats.cpuUsage.toFixed(1)}%
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   CPU Usage
                 </Typography>
+                <Box sx={{ mt: 1 }}>
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={systemStats.cpuUsage} 
+                    color={systemStats.cpuUsage > 80 ? 'error' : systemStats.cpuUsage > 60 ? 'warning' : 'success'}
+                    sx={{ height: 6, borderRadius: 3 }}
+                  />
+                </Box>
               </Box>
             </Grid>
           </Grid>
@@ -931,7 +1103,15 @@ const AdminPanelPage: React.FC = () => {
                       secondary="Require 2FA for all users"
                     />
                     <ListItemSecondaryAction>
-                      <Switch />
+                      <Switch
+                        checked={securitySettings.twoFactorAuth}
+                        onChange={(e) =>
+                          setSecuritySettings({
+                            ...securitySettings,
+                            twoFactorAuth: e.target.checked,
+                          })
+                        }
+                      />
                     </ListItemSecondaryAction>
                   </ListItem>
                   <ListItem>
@@ -943,7 +1123,35 @@ const AdminPanelPage: React.FC = () => {
                       secondary="Enforce strong passwords"
                     />
                     <ListItemSecondaryAction>
-                      <Switch defaultChecked />
+                      <Switch
+                        checked={securitySettings.passwordPolicy}
+                        onChange={(e) =>
+                          setSecuritySettings({
+                            ...securitySettings,
+                            passwordPolicy: e.target.checked,
+                          })
+                        }
+                      />
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon>
+                      <Security />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary="Require Strong Passwords"
+                      secondary="Minimum 8 characters with complexity"
+                    />
+                    <ListItemSecondaryAction>
+                      <Switch
+                        checked={securitySettings.requireStrongPasswords}
+                        onChange={(e) =>
+                          setSecuritySettings({
+                            ...securitySettings,
+                            requireStrongPasswords: e.target.checked,
+                          })
+                        }
+                      />
                     </ListItemSecondaryAction>
                   </ListItem>
                   <ListItem>
@@ -954,15 +1162,118 @@ const AdminPanelPage: React.FC = () => {
                       primary="Session Timeout"
                       secondary="Auto-logout after inactivity"
                     />
-                    <TextField
-                      type="number"
-                      defaultValue={30}
-                      size="small"
-                      sx={{ width: 80 }}
-                      InputProps={{
-                        endAdornment: <Typography variant="caption">min</Typography>,
-                      }}
+                    <ListItemSecondaryAction>
+                      <TextField
+                        type="number"
+                        value={securitySettings.sessionTimeout}
+                        onChange={(e) =>
+                          setSecuritySettings({
+                            ...securitySettings,
+                            sessionTimeout: parseInt(e.target.value),
+                          })
+                        }
+                        size="small"
+                        sx={{ width: 80 }}
+                        InputProps={{
+                          endAdornment: <Typography variant="caption">min</Typography>,
+                        }}
+                      />
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon>
+                      <Warning />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary="Max Login Attempts"
+                      secondary="Maximum failed login attempts before lockout"
                     />
+                    <ListItemSecondaryAction>
+                      <TextField
+                        type="number"
+                        value={securitySettings.maxLoginAttempts}
+                        onChange={(e) =>
+                          setSecuritySettings({
+                            ...securitySettings,
+                            maxLoginAttempts: parseInt(e.target.value),
+                          })
+                        }
+                        size="small"
+                        sx={{ width: 80 }}
+                      />
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon>
+                      <CalendarToday />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary="Password Expiry"
+                      secondary="Days until password expires"
+                    />
+                    <ListItemSecondaryAction>
+                      <TextField
+                        type="number"
+                        value={securitySettings.passwordExpiry}
+                        onChange={(e) =>
+                          setSecuritySettings({
+                            ...securitySettings,
+                            passwordExpiry: parseInt(e.target.value),
+                          })
+                        }
+                        size="small"
+                        sx={{ width: 80 }}
+                        InputProps={{
+                          endAdornment: <Typography variant="caption">days</Typography>,
+                        }}
+                      />
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon>
+                      <Lock />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary="Lockout Duration"
+                      secondary="Minutes to lock account after failed attempts"
+                    />
+                    <ListItemSecondaryAction>
+                      <TextField
+                        type="number"
+                        value={securitySettings.lockoutDuration}
+                        onChange={(e) =>
+                          setSecuritySettings({
+                            ...securitySettings,
+                            lockoutDuration: parseInt(e.target.value),
+                          })
+                        }
+                        size="small"
+                        sx={{ width: 80 }}
+                        InputProps={{
+                          endAdornment: <Typography variant="caption">min</Typography>,
+                        }}
+                      />
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon>
+                      <Assessment />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary="Audit Logging"
+                      secondary="Enable security audit logging"
+                    />
+                    <ListItemSecondaryAction>
+                      <Switch
+                        checked={securitySettings.enableAuditLog}
+                        onChange={(e) =>
+                          setSecuritySettings({
+                            ...securitySettings,
+                            enableAuditLog: e.target.checked,
+                          })
+                        }
+                      />
+                    </ListItemSecondaryAction>
                   </ListItem>
                 </List>
               </CardContent>
@@ -973,7 +1284,7 @@ const AdminPanelPage: React.FC = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom>
-                  Notifications
+                  Security Notifications
                 </Typography>
                 <List>
                   <ListItem>
@@ -981,16 +1292,16 @@ const AdminPanelPage: React.FC = () => {
                       <Email />
                     </ListItemIcon>
                     <ListItemText
-                      primary="Email Notifications"
-                      secondary="Send notifications via email"
+                      primary="Security Alerts"
+                      secondary="Email notifications for security events"
                     />
                     <ListItemSecondaryAction>
                       <Switch
-                        checked={systemSettings.emailNotifications}
+                        checked={securitySettings.enableAuditLog}
                         onChange={(e) =>
-                          setSystemSettings({
-                            ...systemSettings,
-                            emailNotifications: e.target.checked,
+                          setSecuritySettings({
+                            ...securitySettings,
+                            enableAuditLog: e.target.checked,
                           })
                         }
                       />
@@ -998,19 +1309,39 @@ const AdminPanelPage: React.FC = () => {
                   </ListItem>
                   <ListItem>
                     <ListItemIcon>
-                      <Phone />
+                      <Warning />
                     </ListItemIcon>
                     <ListItemText
-                      primary="SMS Notifications"
-                      secondary="Send notifications via SMS"
+                      primary="Failed Login Alerts"
+                      secondary="Notify admins of failed login attempts"
                     />
                     <ListItemSecondaryAction>
                       <Switch
-                        checked={systemSettings.smsNotifications}
+                        checked={securitySettings.enableAuditLog}
                         onChange={(e) =>
-                          setSystemSettings({
-                            ...systemSettings,
-                            smsNotifications: e.target.checked,
+                          setSecuritySettings({
+                            ...securitySettings,
+                            enableAuditLog: e.target.checked,
+                          })
+                        }
+                      />
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon>
+                      <Security />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary="Account Lockout Alerts"
+                      secondary="Notify when accounts are locked"
+                    />
+                    <ListItemSecondaryAction>
+                      <Switch
+                        checked={securitySettings.enableAuditLog}
+                        onChange={(e) =>
+                          setSecuritySettings({
+                            ...securitySettings,
+                            enableAuditLog: e.target.checked,
                           })
                         }
                       />
@@ -1021,6 +1352,70 @@ const AdminPanelPage: React.FC = () => {
             </Card>
           </Grid>
         </Grid>
+
+        <Grid container spacing={3} sx={{ mt: 2 }}>
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Security Audit Log
+                </Typography>
+                <Typography variant="body2" color="text.secondary" paragraph>
+                  Recent security events and activities
+                </Typography>
+                <List>
+                  {auditLogs.length > 0 ? (
+                    auditLogs.map((log: any, index: number) => (
+                      <ListItem key={index}>
+                        <ListItemIcon>
+                          {log.eventType === 'LOGIN_FAILED' && <Warning color="warning" />}
+                          {log.eventType === 'LOGIN_SUCCESS' && <CheckCircle color="success" />}
+                          {log.eventType === 'PASSWORD_CHANGED' && <Security color="info" />}
+                          {log.eventType === 'ACCOUNT_LOCKED' && <Warning color="error" />}
+                          {log.eventType === 'ADMIN_ACTION' && <AdminPanelSettings color="primary" />}
+                          {log.eventType === 'SUSPICIOUS_ACTIVITY' && <Warning color="error" />}
+                          {!['LOGIN_FAILED', 'LOGIN_SUCCESS', 'PASSWORD_CHANGED', 'ACCOUNT_LOCKED', 'ADMIN_ACTION', 'SUSPICIOUS_ACTIVITY'].includes(log.eventType) && <Security color="info" />}
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={`${log.eventType.replace(/_/g, ' ')} - ${log.userEmail || 'Unknown'}`}
+                          secondary={`${new Date(log.timestamp).toLocaleString()} • IP: ${log.ipAddress}`}
+                        />
+                      </ListItem>
+                    ))
+                  ) : (
+                    <ListItem>
+                      <ListItemText
+                        primary="No security events found"
+                        secondary="Security audit log is empty"
+                      />
+                    </ListItem>
+                  )}
+                </List>
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                  <Button variant="outlined" startIcon={<Download />}>
+                    Export Audit Log
+                  </Button>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+        
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
+          <Button
+            variant="contained"
+            onClick={handleUpdateSecuritySettings}
+            sx={{ mr: 1 }}
+          >
+            Save Security Settings
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={fetchSecuritySettings}
+          >
+            Reset
+          </Button>
+        </Box>
       </TabPanel>
 
       {/* Backup & Restore Tab */}
@@ -1259,9 +1654,15 @@ const AdminPanelPage: React.FC = () => {
                   fullWidth
                   label="Office Latitude"
                   type="number"
-                  value={officeLocation.latitude}
+                  value={systemConfig.officeLocation.latitude}
                   onChange={(e) =>
-                    setOfficeLocation({ ...officeLocation, latitude: parseFloat(e.target.value) || 0 })
+                    setSystemConfig({
+                      ...systemConfig,
+                      officeLocation: {
+                        ...systemConfig.officeLocation,
+                        latitude: parseFloat(e.target.value) || 0
+                      }
+                    })
                   }
                   inputProps={{ step: 0.000001, min: -90, max: 90 }}
                   helperText="Latitude must be between -90 and 90"
@@ -1272,9 +1673,15 @@ const AdminPanelPage: React.FC = () => {
                   fullWidth
                   label="Office Longitude"
                   type="number"
-                  value={officeLocation.longitude}
+                  value={systemConfig.officeLocation.longitude}
                   onChange={(e) =>
-                    setOfficeLocation({ ...officeLocation, longitude: parseFloat(e.target.value) || 0 })
+                    setSystemConfig({
+                      ...systemConfig,
+                      officeLocation: {
+                        ...systemConfig.officeLocation,
+                        longitude: parseFloat(e.target.value) || 0
+                      }
+                    })
                   }
                   inputProps={{ step: 0.000001, min: -180, max: 180 }}
                   helperText="Longitude must be between -180 and 180"
@@ -1285,9 +1692,15 @@ const AdminPanelPage: React.FC = () => {
                   fullWidth
                   label="Maximum Distance (km)"
                   type="number"
-                  value={officeLocation.maxDistance}
+                  value={systemConfig.locationValidation.maxDistanceKm}
                   onChange={(e) =>
-                    setOfficeLocation({ ...officeLocation, maxDistance: parseFloat(e.target.value) || 0 })
+                    setSystemConfig({
+                      ...systemConfig,
+                      locationValidation: {
+                        ...systemConfig.locationValidation,
+                        maxDistanceKm: parseFloat(e.target.value) || 0
+                      }
+                    })
                   }
                   inputProps={{ min: 0, step: 1 }}
                   helperText="Maximum allowed distance from office for attendance"
@@ -1297,9 +1710,15 @@ const AdminPanelPage: React.FC = () => {
                 <FormControlLabel
                   control={
                     <Switch
-                      checked={officeLocation.locationValidationEnabled}
+                      checked={systemConfig.locationValidation.enabled}
                       onChange={(e) =>
-                        setOfficeLocation({ ...officeLocation, locationValidationEnabled: e.target.checked })
+                        setSystemConfig({
+                          ...systemConfig,
+                          locationValidation: {
+                            ...systemConfig.locationValidation,
+                            enabled: e.target.checked
+                          }
+                        })
                       }
                     />
                   }
@@ -1311,21 +1730,28 @@ const AdminPanelPage: React.FC = () => {
             <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
               <Button
                 variant="contained"
-                onClick={() => updateOfficeLocation(officeLocation)}
-                disabled={locationLoading}
-                startIcon={locationLoading ? <CircularProgress size={20} /> : <Save />}
+                onClick={() => updateSystemConfig(systemConfig)}
+                disabled={configLoading}
+                startIcon={configLoading ? <CircularProgress size={20} /> : <Save />}
               >
-                {locationLoading ? 'Updating...' : 'Update Office Location'}
+                {configLoading ? 'Updating...' : 'Update System Configuration'}
               </Button>
               <Button
                 variant="outlined"
                 onClick={() => {
                   // Set to a common location (e.g., London)
-                  setOfficeLocation({
-                    latitude: 51.5074,
-                    longitude: -0.1278,
-                    maxDistance: 100,
-                    locationValidationEnabled: true,
+                  setSystemConfig({
+                    ...systemConfig,
+                    officeLocation: {
+                      ...systemConfig.officeLocation,
+                      latitude: 51.5074,
+                      longitude: -0.1278,
+                    },
+                    locationValidation: {
+                      ...systemConfig.locationValidation,
+                      maxDistanceKm: 100,
+                      enabled: true,
+                    }
                   });
                 }}
               >
@@ -1335,9 +1761,12 @@ const AdminPanelPage: React.FC = () => {
                 variant="outlined"
                 onClick={() => {
                   // Disable location validation
-                  setOfficeLocation({
-                    ...officeLocation,
-                    locationValidationEnabled: false,
+                  setSystemConfig({
+                    ...systemConfig,
+                    locationValidation: {
+                      ...systemConfig.locationValidation,
+                      enabled: false,
+                    }
                   });
                 }}
               >
@@ -1347,11 +1776,11 @@ const AdminPanelPage: React.FC = () => {
 
             <Alert severity="info" sx={{ mt: 3 }}>
               <Typography variant="body2">
-                <strong>Current Office Location:</strong> {officeLocation.latitude.toFixed(6)}, {officeLocation.longitude.toFixed(6)}
+                <strong>Current Office Location:</strong> {systemConfig.officeLocation.latitude.toFixed(6)}, {systemConfig.officeLocation.longitude.toFixed(6)}
                 <br />
-                <strong>Maximum Distance:</strong> {officeLocation.maxDistance} km
+                <strong>Maximum Distance:</strong> {systemConfig.locationValidation.maxDistanceKm} km
                 <br />
-                <strong>Location Validation:</strong> {officeLocation.locationValidationEnabled ? 'Enabled' : 'Disabled'}
+                <strong>Location Validation:</strong> {systemConfig.locationValidation.enabled ? 'Enabled' : 'Disabled'}
               </Typography>
             </Alert>
           </CardContent>

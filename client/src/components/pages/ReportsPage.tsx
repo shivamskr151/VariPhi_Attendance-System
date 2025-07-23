@@ -566,9 +566,9 @@ const ReportsPage: React.FC = () => {
                           attendanceReport.attendance.map((attendance) => (
                             <TableRow key={attendance._id}>
                               <TableCell>
-                                {typeof attendance.employee === 'object'
+                                {typeof attendance.employee === 'object' && attendance.employee
                                   ? `${attendance.employee.firstName} ${attendance.employee.lastName}`
-                                  : attendance.employee}
+                                  : attendance.employee || 'Unknown Employee'}
                               </TableCell>
                               <TableCell>{formatDate(attendance.date)}</TableCell>
                               <TableCell>
@@ -802,9 +802,9 @@ const ReportsPage: React.FC = () => {
                           leaveReport.leaves.map((leave) => (
                             <TableRow key={leave._id}>
                               <TableCell>
-                                {typeof leave.employee === 'object'
+                                {typeof leave.employee === 'object' && leave.employee
                                   ? `${leave.employee.firstName} ${leave.employee.lastName}`
-                                  : leave.employee}
+                                  : leave.employee || 'Unknown Employee'}
                               </TableCell>
                               <TableCell>
                                 <Chip

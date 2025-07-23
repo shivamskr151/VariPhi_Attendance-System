@@ -5,6 +5,7 @@ A modern, full-stack attendance management system built with React, Node.js, and
 ## ✨ Features
 
 - **🔐 Secure Authentication** - JWT-based authentication with role-based access control
+- **📧 Email Invitations** - Send secure invitation emails to new employees with account setup
 - **📱 Responsive Design** - Material-UI powered interface that works on desktop, tablet, and mobile devices
 - **📍 Geolocation Tracking** - Verify employee location during punch in/out with configurable distance limits
 - **📊 Real-time Dashboard** - Live attendance statistics and analytics with Chart.js visualizations
@@ -166,11 +167,8 @@ DEFAULT_LOCATION_LAT=40.7128
 DEFAULT_LOCATION_LNG=-74.0060
 LOCATION_VALIDATION_ENABLED=true
 
-# Email Configuration (Optional)
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_USER=your-email@gmail.com
-EMAIL_PASS=your-app-password
+# Email Configuration (Pre-configured for variphi.com SMTP)
+# No environment variables needed - email service is automatically configured
 
 # File Upload
 MAX_FILE_SIZE=5242880
@@ -218,16 +216,28 @@ MAX_DISTANCE_KM=50
 LOCATION_VALIDATION_ENABLED=true
 ```
 
-### Email Notifications
+### Email Configuration
 
-Set up email notifications for leave approvals and system alerts:
+The system is configured to use **variphi.com** SMTP server for sending emails. The email service is pre-configured and ready to use.
 
+**Current Configuration:**
+- **SMTP Server**: smtpout.secureserver.net
+- **Port**: 465 (SSL)
+- **Email**: information@variphi.com
+- **Authentication**: SSL/TLS
+
+**Features:**
+- ✅ Invitation emails for new employees
+- ✅ Password reset emails
+- ✅ Welcome emails
+- ✅ Proper Message-ID formatting
+- ✅ SSL/TLS encryption
+
+**No additional setup required** - the email service is automatically configured and ready to use.
+
+**Frontend URL for invitation links:**
 ```env
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_USER=your-email@gmail.com
-EMAIL_PASS=your-app-password
-EMAIL_FROM=noreply@yourcompany.com
+FRONTEND_URL=http://localhost:3000
 ```
 
 ## 🐛 Troubleshooting
@@ -329,6 +339,15 @@ EMAIL_FROM=noreply@yourcompany.com
 - `POST /api/employees` - Create new employee
 - `PUT /api/employees/:id` - Update employee
 - `DELETE /api/employees/:id` - Deactivate employee
+
+### Invitation Management (Admin Only)
+
+- `POST /api/invitations/send` - Send invitation email to new employee
+- `POST /api/invitations/send-bulk` - Send invitations to multiple employees
+- `GET /api/invitations/verify/:token` - Verify invitation token
+- `POST /api/invitations/accept` - Accept invitation and set up account
+- `POST /api/invitations/resend/:employeeId` - Resend invitation email
+- `GET /api/invitations/pending` - Get pending invitations
 
 ### Reports
 

@@ -244,16 +244,19 @@ const PendingLeavesPage: React.FC = () => {
 
   const getEmployeeName = (employee: any) => {
     if (typeof employee === 'string') return 'Unknown Employee';
-    return `${employee.firstName} ${employee.lastName}`;
+    if (!employee || typeof employee !== 'object') return 'Unknown Employee';
+    return `${employee.firstName || 'Unknown'} ${employee.lastName || 'Employee'}`;
   };
 
   const getEmployeeId = (employee: any) => {
     if (typeof employee === 'string') return 'N/A';
+    if (!employee || typeof employee !== 'object') return 'N/A';
     return employee.employeeId || 'N/A';
   };
 
   const getDepartment = (employee: any) => {
     if (typeof employee === 'string') return 'N/A';
+    if (!employee || typeof employee !== 'object') return 'N/A';
     return employee.department || 'N/A';
   };
 

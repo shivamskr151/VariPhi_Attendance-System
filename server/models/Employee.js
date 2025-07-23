@@ -103,6 +103,12 @@ const employeeSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  invitationToken: String,
+  invitationExpires: Date,
+  invitationAccepted: {
+    type: Boolean,
+    default: false
+  },
   preferences: {
     language: { type: String, default: 'en' },
     theme: { type: String, default: 'light' },

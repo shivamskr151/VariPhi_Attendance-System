@@ -21,6 +21,7 @@ import {
   AdminPanelSettings,
   PendingActions,
   Person,
+  Email,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -82,6 +83,12 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose }) => {
       text: 'Admin Panel',
       icon: <AdminPanelSettings />,
       path: '/admin',
+      roles: ['admin'],
+    },
+    {
+      text: 'Invitations',
+      icon: <Email />,
+      path: '/invitations',
       roles: ['admin'],
     },
     {

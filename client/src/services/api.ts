@@ -172,6 +172,8 @@ export const adminAPI = {
   
   getSystemStats: () => api.get('/admin/system-stats'),
   
+  getSystemHealth: () => api.get('/admin/system-health'),
+  
   getUsers: (params?: any) => api.get('/admin/users', { params }),
   
   createUser: (userData: any) => api.post('/admin/users', userData),
@@ -187,9 +189,19 @@ export const adminAPI = {
   
   updateSettings: (settings: any) => api.put('/admin/settings', settings),
   
+  getSecuritySettings: () => api.get('/admin/security-settings'),
+  
+  updateSecuritySettings: (settings: any) => api.put('/admin/security-settings', settings),
+  
+  getSecurityAuditLog: (params?: any) => api.get('/admin/security-audit-log', { params }),
+  
   getOfficeLocation: () => api.get('/admin/office-location'),
   
   updateOfficeLocation: (locationData: any) => api.put('/admin/office-location', locationData),
+  
+  getSystemConfig: () => api.get('/config'),
+  
+  updateSystemConfig: (configData: any) => api.put('/config', configData),
   
   createBackup: () => api.post('/admin/backup'),
   

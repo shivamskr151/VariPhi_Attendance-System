@@ -100,6 +100,15 @@ const socketHandler = (io, socket) => {
     });
   });
 
+  // Handle system health monitoring requests
+  socket.on('request_system_health', (data) => {
+    if (data.role === 'admin') {
+      // Admin can request system health updates
+      socket.join('system_health_room');
+      console.log('Admin joined system health monitoring room');
+    }
+  });
+
   // Handle real-time notifications
   socket.on('send_notification', (data) => {
     const { recipientId, notification } = data;
@@ -250,6 +259,15 @@ const getConnectedEmployees = (io) => {
   return connectedEmployees;
 };
 
+// Helper function to emit system health updates
+const emitSystemHealthUpdate = (io, systemMetrics) => {
+  io.to('system_health_room').emit('system_health_update', {
+    type: 'system_health_update',
+    data: systemMetrics,
+    timestamp: new Date().toISOString()
+  });
+};
+
 module.exports = {
   socketHandler,
   emitAttendanceUpdate,
@@ -257,5 +275,6 @@ module.exports = {
   emitNewLeaveRequest,
   emitNotification,
   getConnectedUsersCount,
-  getConnectedEmployees
+  getConnectedEmployees,
+  emitSystemHealthUpdate
 }; 

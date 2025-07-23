@@ -21,6 +21,8 @@ import ReportsPage from './components/pages/ReportsPage';
 import AdminPanelPage from './components/pages/AdminPanelPage';
 import SettingsPage from './components/pages/SettingsPage';
 import ProfilePage from './components/pages/ProfilePage';
+import InvitationManagementPage from './components/pages/InvitationManagementPage';
+import AcceptInvitationPage from './components/pages/AcceptInvitationPage';
 
 
 
@@ -60,6 +62,7 @@ const App: React.FC = () => {
   return (
     <Routes>
       <Route path="/login" element={<LoginForm />} />
+      <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
       <Route
         path="/dashboard"
         element={
@@ -113,6 +116,14 @@ const App: React.FC = () => {
         element={
           <ProtectedRoute>
             <AdminPanelPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/invitations"
+        element={
+          <ProtectedRoute>
+            <InvitationManagementPage />
           </ProtectedRoute>
         }
       />
