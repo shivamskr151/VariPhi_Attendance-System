@@ -22,194 +22,26 @@ const positions = {
 const sampleEmployees = [
   {
     employeeId: 'EMP001',
-    firstName: 'John',
-    lastName: 'Smith',
-    email: 'john.smith@company.com',
-    password: 'password123',
-    phone: '+1-555-0101',
+    firstName: 'Shivam',
+    lastName: 'Rai',
+    email: 'shivam.kumar@variphi.com',
+    password: 'Variphi@2025',
+    phone: '+91-9798415480',
     department: 'IT',
-    position: 'Senior Developer',
+    position: 'Admin',
     role: 'admin',
-    hireDate: new Date('2022-01-15'),
+    hireDate: new Date('2024-11-07'),
     address: {
-      street: '123 Main St',
-      city: 'New York',
-      state: 'NY',
-      zipCode: '10001',
-      country: 'USA'
+      street: '100 Main St',
+      city: 'Bangalore',
+      state: 'KA',
+      zipCode: '560001',
+      country: 'India'
     },
     emergencyContact: {
-      name: 'Jane Smith',
-      relationship: 'Spouse',
-      phone: '+1-555-0102'
-    }
-  },
-  {
-    employeeId: 'EMP002',
-    firstName: 'Sarah',
-    lastName: 'Johnson',
-    email: 'sarah.johnson@company.com',
-    password: 'password123',
-    phone: '+1-555-0103',
-    department: 'HR',
-    position: 'HR Manager',
-    role: 'manager',
-    hireDate: new Date('2021-08-20'),
-    address: {
-      street: '456 Oak Ave',
-      city: 'Los Angeles',
-      state: 'CA',
-      zipCode: '90210',
-      country: 'USA'
-    },
-    emergencyContact: {
-      name: 'Mike Johnson',
-      relationship: 'Spouse',
-      phone: '+1-555-0104'
-    }
-  },
-  {
-    employeeId: 'EMP003',
-    firstName: 'Michael',
-    lastName: 'Brown',
-    email: 'michael.brown@company.com',
-    password: 'password123',
-    phone: '+1-555-0105',
-    department: 'Finance',
-    position: 'Financial Analyst',
-    role: 'employee',
-    hireDate: new Date('2023-03-10'),
-    address: {
-      street: '789 Pine Rd',
-      city: 'Chicago',
-      state: 'IL',
-      zipCode: '60601',
-      country: 'USA'
-    },
-    emergencyContact: {
-      name: 'Lisa Brown',
-      relationship: 'Sister',
-      phone: '+1-555-0106'
-    }
-  },
-  {
-    employeeId: 'EMP004',
-    firstName: 'Emily',
-    lastName: 'Davis',
-    email: 'emily.davis@company.com',
-    password: 'password123',
-    phone: '+1-555-0107',
-    department: 'Marketing',
-    position: 'Marketing Specialist',
-    role: 'employee',
-    hireDate: new Date('2022-11-05'),
-    address: {
-      street: '321 Elm St',
-      city: 'Miami',
-      state: 'FL',
-      zipCode: '33101',
-      country: 'USA'
-    },
-    emergencyContact: {
-      name: 'David Davis',
-      relationship: 'Father',
-      phone: '+1-555-0108'
-    }
-  },
-  {
-    employeeId: 'EMP005',
-    firstName: 'David',
-    lastName: 'Wilson',
-    email: 'david.wilson@company.com',
-    password: 'password123',
-    phone: '+1-555-0109',
-    department: 'Sales',
-    position: 'Sales Manager',
-    role: 'manager',
-    hireDate: new Date('2021-12-01'),
-    address: {
-      street: '654 Maple Dr',
-      city: 'Seattle',
-      state: 'WA',
-      zipCode: '98101',
-      country: 'USA'
-    },
-    emergencyContact: {
-      name: 'Rachel Wilson',
-      relationship: 'Spouse',
-      phone: '+1-555-0110'
-    }
-  },
-  {
-    employeeId: 'EMP006',
-    firstName: 'Lisa',
-    lastName: 'Anderson',
-    email: 'lisa.anderson@company.com',
-    password: 'password123',
-    phone: '+1-555-0111',
-    department: 'IT',
-    position: 'QA Engineer',
-    role: 'employee',
-    hireDate: new Date('2023-06-15'),
-    address: {
-      street: '987 Cedar Ln',
-      city: 'Austin',
-      state: 'TX',
-      zipCode: '73301',
-      country: 'USA'
-    },
-    emergencyContact: {
-      name: 'Tom Anderson',
-      relationship: 'Brother',
-      phone: '+1-555-0112'
-    }
-  },
-  {
-    employeeId: 'EMP007',
-    firstName: 'Robert',
-    lastName: 'Taylor',
-    email: 'robert.taylor@company.com',
-    password: 'password123',
-    phone: '+1-555-0113',
-    department: 'Operations',
-    position: 'Operations Manager',
-    role: 'manager',
-    hireDate: new Date('2022-04-20'),
-    address: {
-      street: '147 Birch Way',
-      city: 'Denver',
-      state: 'CO',
-      zipCode: '80201',
-      country: 'USA'
-    },
-    emergencyContact: {
-      name: 'Maria Taylor',
-      relationship: 'Spouse',
-      phone: '+1-555-0114'
-    }
-  },
-  {
-    employeeId: 'EMP008',
-    firstName: 'Jennifer',
-    lastName: 'Martinez',
-    email: 'jennifer.martinez@company.com',
-    password: 'password123',
-    phone: '+1-555-0115',
-    department: 'Finance',
-    position: 'Accountant',
-    role: 'employee',
-    hireDate: new Date('2023-01-30'),
-    address: {
-      street: '258 Spruce Ct',
-      city: 'Phoenix',
-      state: 'AZ',
-      zipCode: '85001',
-      country: 'USA'
-    },
-    emergencyContact: {
-      name: 'Carlos Martinez',
-      relationship: 'Husband',
-      phone: '+1-555-0116'
+      name: 'Akash Kumar',
+      relationship: 'Friend',
+      phone: '+91-9876543210'
     }
   }
 ];
@@ -412,8 +244,8 @@ async function seedDatabase() {
     console.log(`   🏖️ Leave Requests: ${leaveData.length}`);
     
     console.log('\n🔑 Default Login Credentials:');
-    console.log('   Email: john.smith@company.com');
-    console.log('   Password: password123');
+    console.log('   Email: shivam.kumar@variphi.com');
+    console.log('   Password: Variphi@2025');
     console.log('   Role: Admin');
     
     console.log('\n✅ Database seeding completed successfully!');

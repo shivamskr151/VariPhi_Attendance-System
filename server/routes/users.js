@@ -188,17 +188,320 @@ router.put('/change-password', passwordChangeValidation, authenticateToken, asyn
 // @access  Private
 router.put('/preferences', authenticateToken, asyncHandler(async (req, res) => {
   const employee = req.employee;
-  const preferences = req.body;
+  const newPreferences = req.body;
 
-  // Update preferences
-  employee.preferences = { ...employee.preferences, ...preferences };
+  // Validate preferences
+  const validationErrors = validatePreferences(newPreferences);
+  if (validationErrors.length > 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation failed',
+      errors: validationErrors
+    });
+  }
+
+  // Get current preferences and merge with new ones
+  const currentPreferences = employee.preferences || {};
+  const updatedPreferences = { ...currentPreferences };
+
+  // Update only the provided preferences
+  Object.keys(newPreferences).forEach(key => {
+    if (newPreferences[key] !== undefined) {
+      updatedPreferences[key] = newPreferences[key];
+    }
+  });
+
+  // Update employee preferences
+  employee.preferences = updatedPreferences;
   await employee.save();
 
   res.json({
     success: true,
-    message: 'Preferences updated successfully'
+    message: 'Preferences updated successfully',
+    data: {
+      preferences: employee.preferences
+    }
   });
 }));
+
+// @route   GET /api/users/preferences
+// @desc    Get user preferences
+// @access  Private
+router.get('/preferences', authenticateToken, asyncHandler(async (req, res) => {
+  const employee = req.employee;
+
+  res.json({
+    success: true,
+    data: {
+      preferences: employee.preferences || {}
+    }
+  });
+}));
+
+// @route   POST /api/users/preferences/reset
+// @desc    Reset user preferences to default
+// @access  Private
+router.post('/preferences/reset', authenticateToken, asyncHandler(async (req, res) => {
+  const employee = req.employee;
+  const { categories } = req.body; // Optional: reset only specific categories
+
+  // Get default preferences
+  const defaultPreferences = getDefaultPreferences();
+  
+  if (categories && Array.isArray(categories)) {
+    // Reset only specific categories
+    const categoryFields = getCategoryFields(categories);
+    categoryFields.forEach(field => {
+      employee.preferences[field] = defaultPreferences[field];
+    });
+  } else {
+    // Reset all preferences
+    employee.preferences = defaultPreferences;
+  }
+
+  await employee.save();
+
+  res.json({
+    success: true,
+    message: 'Preferences reset successfully',
+    data: {
+      preferences: employee.preferences
+    }
+  });
+}));
+
+// @route   GET /api/users/preferences/schema
+// @desc    Get preferences schema/configuration
+// @access  Private
+router.get('/preferences/schema', authenticateToken, asyncHandler(async (req, res) => {
+  const schema = getPreferencesSchema();
+  
+  res.json({
+    success: true,
+    data: {
+      categories: schema.categories,
+      fields: schema.fields
+    }
+  });
+}));
+
+// Helper function to validate preferences
+function validatePreferences(preferences) {
+  const errors = [];
+  
+  // Define validation rules
+  const validationRules = {
+    fontSize: { type: 'number', min: 12, max: 20 },
+    breakDuration: { type: 'number', min: 15, max: 120 },
+    lowBalanceThreshold: { type: 'number', min: 1, max: 30 },
+    dataRetentionPeriod: { type: 'number', min: 12, max: 84 },
+    autoLogoutTime: { type: 'number', min: 5, max: 480 },
+    sessionTimeout: { type: 'number', min: 1, max: 168 },
+    language: { type: 'string', enum: ['en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'zh', 'ja', 'ko', 'ar', 'hi'] },
+    theme: { type: 'string', enum: ['light', 'dark', 'auto'] },
+    dateFormat: { type: 'string', enum: ['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD', 'DD MMM YYYY'] },
+    timeFormat: { type: 'string', enum: ['12', '24'] },
+    currency: { type: 'string', enum: ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'CNY', 'INR', 'KRW'] },
+    numberFormat: { type: 'string', enum: ['US', 'EU', 'IN'] },
+    dashboardLayout: { type: 'string', enum: ['grid', 'list', 'compact'] },
+    notificationSound: { type: 'string', enum: ['default', 'bell', 'chime', 'ding', 'tone', 'silent'] },
+    reportFormat: { type: 'string', enum: ['pdf', 'excel', 'csv', 'html'] },
+    reportDelivery: { type: 'string', enum: ['email', 'download', 'both'] },
+    profileVisibility: { type: 'string', enum: ['public', 'team', 'managers', 'private'] },
+    calendarProvider: { type: 'string', enum: ['google', 'outlook', 'apple'] },
+    colorBlindMode: { type: 'string', enum: ['none', 'protanopia', 'deuteranopia', 'tritanopia'] },
+    webhookUrl: { type: 'string', pattern: /^(https?:\/\/.+)?$/ }
+  };
+
+  // Validate each preference
+  Object.keys(preferences).forEach(key => {
+    const value = preferences[key];
+    const rule = validationRules[key];
+
+    if (!rule) return; // No validation rule for this field
+
+    // Type validation
+    if (rule.type === 'number' && typeof value !== 'number') {
+      errors.push(`${key} must be a number`);
+      return;
+    }
+
+    if (rule.type === 'string' && typeof value !== 'string') {
+      errors.push(`${key} must be a string`);
+      return;
+    }
+
+    if (rule.type === 'boolean' && typeof value !== 'boolean') {
+      errors.push(`${key} must be a boolean`);
+      return;
+    }
+
+    // Range validation for numbers
+    if (rule.type === 'number') {
+      if (rule.min !== undefined && value < rule.min) {
+        errors.push(`${key} must be at least ${rule.min}`);
+      }
+      if (rule.max !== undefined && value > rule.max) {
+        errors.push(`${key} must be at most ${rule.max}`);
+      }
+    }
+
+    // Enum validation
+    if (rule.enum && !rule.enum.includes(value)) {
+      errors.push(`${key} must be one of: ${rule.enum.join(', ')}`);
+    }
+
+    // Pattern validation
+    if (rule.pattern && typeof value === 'string' && !rule.pattern.test(value)) {
+      errors.push(`${key} format is invalid`);
+    }
+  });
+
+  return errors;
+}
+
+// Helper function to get default preferences
+function getDefaultPreferences() {
+  return {
+    // General Settings
+    language: 'en',
+    theme: 'light',
+    timezone: 'UTC',
+    dateFormat: 'MM/DD/YYYY',
+    timeFormat: '12',
+    currency: 'USD',
+    numberFormat: 'US',
+    
+    // Display Settings
+    dashboardLayout: 'grid',
+    sidebarCollapsed: false,
+    compactMode: false,
+    showTooltips: true,
+    animationsEnabled: true,
+    highContrast: false,
+    fontSize: 14,
+    
+    // Notification Settings
+    emailNotifications: true,
+    smsNotifications: false,
+    pushNotifications: true,
+    browserNotifications: true,
+    soundEnabled: true,
+    notificationSound: 'default',
+    
+    // Attendance Settings
+    attendanceReminders: true,
+    reminderTime: '08:45',
+    autoBreakDeduction: true,
+    breakDuration: 60,
+    overtimeNotifications: true,
+    lateArrivalNotifications: true,
+    earlyDepartureNotifications: true,
+    weekendReminders: false,
+    holidayReminders: false,
+    
+    // Leave Settings
+    leaveNotifications: true,
+    leaveApprovalNotifications: true,
+    leaveRejectionNotifications: true,
+    leaveBalanceReminders: true,
+    lowBalanceThreshold: 5,
+    autoSubmitLeaveRequests: false,
+    
+    // Report Settings
+    weeklyReports: false,
+    monthlyReports: true,
+    reportFormat: 'pdf',
+    reportDelivery: 'email',
+    includeCharts: true,
+    reportLanguage: 'en',
+    
+    // Privacy Settings
+    profileVisibility: 'team',
+    shareAttendanceData: true,
+    shareLeaveData: true,
+    allowManagerAccess: true,
+    twoFactorReminders: true,
+    
+    // Advanced Settings
+    enableBetaFeatures: false,
+    enableDebugMode: false,
+    dataRetentionPeriod: 24,
+    autoLogout: true,
+    autoLogoutTime: 30,
+    sessionTimeout: 24,
+    
+    // Mobile Settings
+    locationTracking: true,
+    backgroundSync: true,
+    offlineMode: true,
+    biometricLogin: false,
+    quickActions: ['punch_in', 'punch_out', 'request_leave'],
+    
+    // Integration Settings
+    calendarSync: false,
+    calendarProvider: 'google',
+    slackIntegration: false,
+    teamsIntegration: false,
+    webhookUrl: '',
+    
+    // Accessibility Settings
+    screenReader: false,
+    keyboardNavigation: false,
+    reducedMotion: false,
+    colorBlindMode: 'none',
+    largeText: false,
+    
+    // Custom Settings
+    customSettings: {}
+  };
+}
+
+// Helper function to get fields by categories
+function getCategoryFields(categories) {
+  const categoryFieldMap = {
+    general: ['language', 'theme', 'timezone', 'dateFormat', 'timeFormat', 'currency', 'numberFormat'],
+    display: ['dashboardLayout', 'sidebarCollapsed', 'compactMode', 'showTooltips', 'animationsEnabled', 'highContrast', 'fontSize'],
+    notifications: ['emailNotifications', 'smsNotifications', 'pushNotifications', 'browserNotifications', 'soundEnabled', 'notificationSound'],
+    attendance: ['attendanceReminders', 'reminderTime', 'autoBreakDeduction', 'breakDuration', 'overtimeNotifications', 'lateArrivalNotifications', 'earlyDepartureNotifications', 'weekendReminders', 'holidayReminders'],
+    leave: ['leaveNotifications', 'leaveApprovalNotifications', 'leaveRejectionNotifications', 'leaveBalanceReminders', 'lowBalanceThreshold', 'autoSubmitLeaveRequests'],
+    reports: ['weeklyReports', 'monthlyReports', 'reportFormat', 'reportDelivery', 'includeCharts', 'reportLanguage'],
+    privacy: ['profileVisibility', 'shareAttendanceData', 'shareLeaveData', 'allowManagerAccess', 'twoFactorReminders'],
+    advanced: ['enableBetaFeatures', 'enableDebugMode', 'dataRetentionPeriod', 'autoLogout', 'autoLogoutTime', 'sessionTimeout'],
+    mobile: ['locationTracking', 'backgroundSync', 'offlineMode', 'biometricLogin', 'quickActions'],
+    integrations: ['calendarSync', 'calendarProvider', 'slackIntegration', 'teamsIntegration', 'webhookUrl'],
+    accessibility: ['screenReader', 'keyboardNavigation', 'reducedMotion', 'colorBlindMode', 'largeText']
+  };
+
+  let fields = [];
+  categories.forEach(category => {
+    if (categoryFieldMap[category]) {
+      fields = fields.concat(categoryFieldMap[category]);
+    }
+  });
+
+  return fields;
+}
+
+// Helper function to get preferences schema
+function getPreferencesSchema() {
+  return {
+    categories: [
+      { key: 'general', label: 'General', description: 'Basic system preferences and localization settings', icon: 'SettingsApplications' },
+      { key: 'display', label: 'Display & Appearance', description: 'Customize the look and feel of your interface', icon: 'Palette' },
+      { key: 'notifications', label: 'Notifications', description: 'Configure how and when you receive notifications', icon: 'Notifications' },
+      { key: 'attendance', label: 'Attendance', description: 'Attendance tracking and reminder preferences', icon: 'Schedule' },
+      { key: 'leave', label: 'Leave Management', description: 'Leave request and approval notification settings', icon: 'EventNote' },
+      { key: 'reports', label: 'Reports & Analytics', description: 'Report generation and delivery preferences', icon: 'Analytics' },
+      { key: 'privacy', label: 'Privacy & Security', description: 'Control your data sharing and privacy settings', icon: 'Shield' },
+      { key: 'advanced', label: 'Advanced', description: 'Advanced system settings and beta features', icon: 'Security' },
+      { key: 'mobile', label: 'Mobile', description: 'Mobile app specific preferences', icon: 'DeviceHub' },
+      { key: 'integrations', label: 'Integrations', description: 'Third-party service integrations', icon: 'CloudSync' },
+      { key: 'accessibility', label: 'Accessibility', description: 'Accessibility and usability options', icon: 'Accessibility' }
+    ],
+    fields: [] // Would include full field definitions in a real implementation
+  };
+}
 
 // @route   GET /api/users/export-data
 // @desc    Export user data

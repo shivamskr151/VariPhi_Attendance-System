@@ -93,7 +93,7 @@ class EmailService {
       <body>
         <div class="container">
           <div class="header">
-            <h1>🏢 Welcome to Attendance System</h1>
+            <h1>🏢 Welcome to VariPhi Attendance System</h1>
           </div>
           <div class="content">
             <h2>Hello ${employee.firstName} ${employee.lastName}!</h2>
@@ -251,7 +251,7 @@ Please do not reply to this email.
       <body>
         <div class="container">
           <div class="header">
-            <h1>🎉 Welcome to Attendance System!</h1>
+            <h1>🎉 Welcome to VariPhi Attendance System!</h1>
           </div>
           <div class="content">
             <h2>Hello ${employee.firstName} ${employee.lastName}!</h2>
@@ -281,9 +281,9 @@ Please do not reply to this email.
 
     return this.sendEmail({
       to: employee.email,
-      subject: 'Welcome to Attendance System - Your Account is Ready!',
+      subject: 'Welcome to VariPhi Attendance System - Your Account is Ready!',
       html: htmlContent,
-      text: `Welcome to Attendance System!\n\nHello ${employee.firstName},\n\nYour account has been successfully set up. You can now login at: ${loginLink}`
+      text: `Welcome to VariPhi Attendance System!\n\nHello ${employee.firstName},\n\nYour account has been successfully set up. You can now login at: ${loginLink}`
     });
   }
 }

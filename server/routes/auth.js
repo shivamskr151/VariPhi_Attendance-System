@@ -8,6 +8,8 @@ const {
   authenticateToken 
 } = require('../middleware/auth');
 const { asyncHandler, ValidationError } = require('../middleware/errorHandler');
+const speakeasy = require('speakeasy');
+const QRCode = require('qrcode');
 
 const router = express.Router();
 
@@ -65,7 +67,7 @@ router.post('/login', loginValidation, asyncHandler(async (req, res) => {
     throw new ValidationError('Validation failed', errors.array());
   }
 
-  const { email, password } = req.body;
+  const { email, password, twoFactorCode } = req.body;
 
   // Find employee by email
   const employee = await Employee.findByEmail(email);
@@ -91,6 +93,29 @@ router.post('/login', loginValidation, asyncHandler(async (req, res) => {
       success: false,
       message: 'Invalid credentials'
     });
+  }
+
+  // If 2FA is enabled, require code
+  if (employee.twoFactorEnabled) {
+    if (!twoFactorCode) {
+      return res.status(200).json({
+        success: false,
+        twoFactorRequired: true,
+        message: '2FA code required',
+        data: { twoFactorRequired: true }
+      });
+    }
+    const verified = speakeasy.totp.verify({
+      secret: employee.twoFactorSecret,
+      encoding: 'base32',
+      token: twoFactorCode
+    });
+    if (!verified) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid 2FA code'
+      });
+    }
   }
 
   // Update last login
@@ -339,6 +364,79 @@ router.post('/forgot-password', [
       message: 'If the email exists, a password reset link has been generated'
     });
   }
+}));
+
+// 2FA Setup - Step 1: Generate secret and QR code
+router.post('/2fa/setup', authenticateToken, asyncHandler(async (req, res) => {
+  const employee = await Employee.findById(req.employee._id);
+  if (!employee) {
+    return res.status(404).json({ success: false, message: 'User not found' });
+  }
+  if (employee.twoFactorEnabled) {
+    return res.status(400).json({ success: false, message: '2FA already enabled' });
+  }
+  // Generate secret
+  const secret = speakeasy.generateSecret();
+  employee.twoFactorTempSecret = secret.base32;
+  await employee.save();
+  // Manually construct otpauth URL with issuer and label
+  const label = `AttendanceSystem:${employee.email}`;
+  const issuer = 'AttendanceSystem';
+  const otpauthUrl = `otpauth://totp/${encodeURIComponent(label)}?secret=${secret.base32}&issuer=${encodeURIComponent(issuer)}`;
+  const qrCodeDataURL = await QRCode.toDataURL(otpauthUrl);
+  res.json({
+    success: true,
+    data: {
+      otpauthUrl,
+      qrCodeDataURL,
+      secret: secret.base32
+    }
+  });
+}));
+
+// 2FA Setup - Step 2: Verify code and enable 2FA
+router.post('/2fa/verify-setup', authenticateToken, asyncHandler(async (req, res) => {
+  const { code } = req.body;
+  const employee = await Employee.findById(req.employee._id);
+  if (!employee || !employee.twoFactorTempSecret) {
+    return res.status(400).json({ success: false, message: '2FA setup not started' });
+  }
+  const verified = speakeasy.totp.verify({
+    secret: employee.twoFactorTempSecret,
+    encoding: 'base32',
+    token: code
+  });
+  if (!verified) {
+    return res.status(400).json({ success: false, message: 'Invalid 2FA code' });
+  }
+  employee.twoFactorSecret = employee.twoFactorTempSecret;
+  employee.twoFactorTempSecret = null;
+  employee.twoFactorEnabled = true;
+  await employee.save();
+  // Optionally: log event
+  res.json({ success: true, message: '2FA enabled' });
+}));
+
+// 2FA Disable
+router.post('/2fa/disable', authenticateToken, asyncHandler(async (req, res) => {
+  const { code } = req.body;
+  const employee = await Employee.findById(req.employee._id);
+  if (!employee || !employee.twoFactorEnabled) {
+    return res.status(400).json({ success: false, message: '2FA not enabled' });
+  }
+  const verified = speakeasy.totp.verify({
+    secret: employee.twoFactorSecret,
+    encoding: 'base32',
+    token: code
+  });
+  if (!verified) {
+    return res.status(400).json({ success: false, message: 'Invalid 2FA code' });
+  }
+  employee.twoFactorSecret = null;
+  employee.twoFactorEnabled = false;
+  await employee.save();
+  // Optionally: log event
+  res.json({ success: true, message: '2FA disabled' });
 }));
 
 module.exports = router; 

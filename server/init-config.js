@@ -34,6 +34,15 @@ async function initializeConfig() {
       };
       updated = true;
     }
+
+    if (!config.adminContact) {
+      config.adminContact = process.env.ADMIN_CONTACT_EMAIL || 'information@variphi.com';
+      updated = true;
+    }
+    if (typeof config.selfRegistrationEnabled !== 'boolean') {
+      config.selfRegistrationEnabled = false;
+      updated = true;
+    }
     
     if (updated) {
       await config.save();

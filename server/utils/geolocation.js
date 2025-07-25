@@ -220,6 +220,13 @@ const validateIPLocation = (ipAddress) => {
   return { isValid: true };
 };
 
+// Utility: Check if a date is a working day (Mon-Sat)
+function isWorkingDay(date) {
+  const day = (date instanceof Date ? date : new Date(date)).getDay();
+  // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  return day >= 1 && day <= 6;
+}
+
 module.exports = {
   calculateDistance,
   validateCoordinates,
@@ -230,5 +237,6 @@ module.exports = {
   isLate,
   getTimezoneOffset,
   formatLocation,
-  validateIPLocation
+  validateIPLocation,
+  isWorkingDay
 }; 

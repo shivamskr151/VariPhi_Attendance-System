@@ -36,6 +36,20 @@ router.get('/', authenticateToken, asyncHandler(async (req, res) => {
   });
 }));
 
+// @route   GET /api/config/public
+// @desc    Get public system configuration (admin contact, registration flag)
+// @access  Public
+router.get('/public', asyncHandler(async (req, res) => {
+  const config = await SystemConfig.getConfig();
+  res.json({
+    success: true,
+    data: {
+      adminContact: config.adminContact,
+      selfRegistrationEnabled: config.selfRegistrationEnabled
+    }
+  });
+}));
+
 // @route   PUT /api/config
 // @desc    Update system configuration (Admin only)
 // @access  Private (Admin)

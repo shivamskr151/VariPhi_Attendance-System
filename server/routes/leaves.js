@@ -4,6 +4,7 @@ const Leave = require('../models/Leave');
 const Employee = require('../models/Employee');
 const { authenticateToken, canAccessEmployee, requireManager } = require('../middleware/auth');
 const { asyncHandler, ValidationError } = require('../middleware/errorHandler');
+const { isWorkingDay } = require('../utils/geolocation');
 
 const router = express.Router();
 
@@ -137,10 +138,15 @@ router.post('/request', leaveRequestValidation, authenticateToken, asyncHandler(
   const employee = await Employee.findById(employeeId);
   const availableBalance = employee.leaveBalance[leaveType] || 0;
 
-  // Calculate required days
-  const diffTime = Math.abs(end - start);
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-  const requiredDays = isHalfDay ? diffDays * 0.5 : diffDays;
+  // Calculate required days (count only working days)
+  let requiredDays = 0;
+  let current = new Date(start);
+  while (current <= end) {
+    if (isWorkingDay(current)) {
+      requiredDays += isHalfDay ? 0.5 : 1;
+    }
+    current.setDate(current.getDate() + 1);
+  }
 
   if (requiredDays > availableBalance) {
     return res.status(400).json({
@@ -168,8 +174,15 @@ router.post('/request', leaveRequestValidation, authenticateToken, asyncHandler(
     });
   }
 
-  // Calculate total days
-  const totalDays = isHalfDay ? diffDays * 0.5 : diffDays;
+  // Calculate total days (count only working days)
+  let totalDays = 0;
+  current = new Date(start);
+  while (current <= end) {
+    if (isWorkingDay(current)) {
+      totalDays += isHalfDay ? 0.5 : 1;
+    }
+    current.setDate(current.getDate() + 1);
+  }
 
   // Create leave request
   const leave = new Leave({

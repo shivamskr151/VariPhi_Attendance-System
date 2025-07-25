@@ -74,6 +74,14 @@ const systemConfigSchema = new mongoose.Schema({
     type: String,
     default: '1.0.0'
   },
+  adminContact: {
+    type: String,
+    default: 'information@variphi.com'
+  },
+  selfRegistrationEnabled: {
+    type: Boolean,
+    default: false
+  },
   
   // Created and updated timestamps
   createdAt: {

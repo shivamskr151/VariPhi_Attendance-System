@@ -20,6 +20,8 @@ const userRoutes = require('./routes/users');
 const reportRoutes = require('./routes/reports');
 const invitationRoutes = require('./routes/invitations');
 const configRoutes = require('./routes/config');
+const documentsRoutes = require('./routes/documents');
+const holidaysRoutes = require('./routes/holidays');
 const { authenticateToken } = require('./middleware/auth');
 const { errorHandler } = require('./middleware/errorHandler');
 const { trackRequest, trackError, getSystemMetrics } = require('./middleware/systemMonitor');
@@ -78,6 +80,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/invitations', invitationRoutes);
 app.use('/api/config', configRoutes);
+app.use('/api/documents', documentsRoutes);
+app.use('/api/holidays', holidaysRoutes);
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

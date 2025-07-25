@@ -46,6 +46,8 @@ import { api } from '../../services/api';
 import { getAttendanceHistory } from '../../store/slices/attendanceSlice';
 import LoadingSpinner from '../common/LoadingSpinner';
 import ErrorAlert from '../common/ErrorAlert';
+import { holidaysAPI } from '../../services/api';
+import { Holiday } from '../../types';
 
 const AttendancePage: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -78,6 +80,10 @@ const AttendancePage: React.FC = () => {
     status: '',
   });
 
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [holidaysLoading, setHolidaysLoading] = useState(false);
+  const [holidaysError, setHolidaysError] = useState<string | null>(null);
+
   useEffect(() => {
     if (user) {
       fetchAttendanceData();
@@ -87,6 +93,14 @@ const AttendancePage: React.FC = () => {
       console.log('No user logged in, skipping attendance data fetch');
     }
   }, [filters, user]);
+
+  useEffect(() => {
+    setHolidaysLoading(true);
+    holidaysAPI.getHolidays()
+      .then(res => setHolidays(res.data.data))
+      .catch(err => setHolidaysError(err.response?.data?.message || 'Failed to load holidays'))
+      .finally(() => setHolidaysLoading(false));
+  }, []);
 
   const getCurrentLocation = () => {
     if (navigator.geolocation) {
@@ -457,6 +471,43 @@ const AttendancePage: React.FC = () => {
             </Grid>
           </Paper>
         )}
+
+        {/* Upcoming Holidays */}
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Upcoming Holidays
+            </Typography>
+            {holidaysLoading ? (
+              <CircularProgress size={24} />
+            ) : holidaysError ? (
+              <Alert severity="error">{holidaysError}</Alert>
+            ) : holidays.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No holidays found.
+              </Typography>
+            ) : (
+              <Box component="ul" sx={{ pl: 2, mb: 0 }}>
+                {holidays
+                  .filter(h => new Date(h.date) >= new Date(new Date().setHours(0,0,0,0)))
+                  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                  .slice(0, 5)
+                  .map((holiday: Holiday) => (
+                    <li key={holiday._id || holiday.date + holiday.name} style={{ marginBottom: 8 }}>
+                      <Typography variant="body1" component="span" sx={{ fontWeight: 500 }}>
+                        {new Date(holiday.date).toLocaleDateString()} - {holiday.name}
+                      </Typography>
+                      {holiday.description && (
+                        <Typography variant="body2" color="text.secondary" component="span" sx={{ ml: 1 }}>
+                          ({holiday.description})
+                        </Typography>
+                      )}
+                    </li>
+                  ))}
+              </Box>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Attendance History */}
         <Card>

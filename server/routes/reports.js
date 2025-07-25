@@ -242,11 +242,41 @@ router.get('/attendance/export', authenticateToken, async (req, res) => {
       .populate('employee', 'firstName lastName department employeeId')
       .sort({ date: -1 });
 
-    // For now, return JSON. In a real implementation, you'd generate Excel/CSV
-    res.json({
-      success: true,
-      data: attendance
-    });
+    // Generate CSV
+    const csvHeaders = [
+      'Employee ID',
+      'Employee Name',
+      'Department',
+      'Date',
+      'Punch In',
+      'Punch Out',
+      'Total Hours',
+      'Status',
+      'Location',
+      'Remote/Office'
+    ];
+    const csvRows = [csvHeaders.join(',')];
+    for (const record of attendance) {
+      const emp = record.employee || {};
+      const row = [
+        emp.employeeId || '',
+        `${emp.firstName || ''} ${emp.lastName || ''}`.trim(),
+        emp.department || '',
+        record.date ? new Date(record.date).toISOString().split('T')[0] : '',
+        record.punchIn && record.punchIn.time ? new Date(record.punchIn.time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '',
+        record.punchOut && record.punchOut.time ? new Date(record.punchOut.time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '',
+        record.totalHours || '',
+        record.status || '',
+        record.punchIn && record.punchIn.location && record.punchIn.location.address ? record.punchIn.location.address.replace(/\n|\r|,/g, ' ') : '',
+        record.isRemote ? 'Remote' : 'Office'
+      ];
+      csvRows.push(row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','));
+    }
+    const csvContent = csvRows.join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="attendance-report-${new Date().toISOString().split('T')[0]}.csv"`);
+    res.status(200).send(csvContent);
   } catch (error) {
     console.error('Error exporting attendance report:', error);
     res.status(500).json({
@@ -285,11 +315,39 @@ router.get('/leaves/export', authenticateToken, async (req, res) => {
       .populate('employee', 'firstName lastName department employeeId')
       .sort({ startDate: -1 });
 
-    // For now, return JSON. In a real implementation, you'd generate Excel/CSV
-    res.json({
-      success: true,
-      data: leaves
-    });
+    // Generate CSV
+    const csvHeaders = [
+      'Employee ID',
+      'Employee Name',
+      'Department',
+      'Leave Type',
+      'Start Date',
+      'End Date',
+      'Total Days',
+      'Status',
+      'Reason'
+    ];
+    const csvRows = [csvHeaders.join(',')];
+    for (const leave of leaves) {
+      const emp = leave.employee || {};
+      const row = [
+        emp.employeeId || '',
+        `${emp.firstName || ''} ${emp.lastName || ''}`.trim(),
+        emp.department || '',
+        leave.leaveType || '',
+        leave.startDate ? new Date(leave.startDate).toISOString().split('T')[0] : '',
+        leave.endDate ? new Date(leave.endDate).toISOString().split('T')[0] : '',
+        leave.totalDays || '',
+        leave.status || '',
+        (leave.reason || '').replace(/\n|\r|,/g, ' ')
+      ];
+      csvRows.push(row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','));
+    }
+    const csvContent = csvRows.join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="leave-report-${new Date().toISOString().split('T')[0]}.csv"`);
+    res.status(200).send(csvContent);
   } catch (error) {
     console.error('Error exporting leave report:', error);
     res.status(500).json({

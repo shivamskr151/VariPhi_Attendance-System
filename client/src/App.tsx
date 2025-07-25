@@ -23,7 +23,7 @@ import SettingsPage from './components/pages/SettingsPage';
 import ProfilePage from './components/pages/ProfilePage';
 import InvitationManagementPage from './components/pages/InvitationManagementPage';
 import AcceptInvitationPage from './components/pages/AcceptInvitationPage';
-
+import DocumentsPage from './pages/DocumentsPage';
 
 
 // Protected Route Component
@@ -140,6 +140,14 @@ const App: React.FC = () => {
         element={
           <ProtectedRoute>
             <ProfilePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/documents"
+        element={
+          <ProtectedRoute>
+            <DocumentsPage />
           </ProtectedRoute>
         }
       />

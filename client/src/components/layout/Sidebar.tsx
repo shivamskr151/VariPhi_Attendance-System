@@ -80,6 +80,12 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose }) => {
       roles: ['manager', 'admin'],
     },
     {
+      text: 'Documents',
+      icon: <Assessment />,
+      path: '/documents',
+      roles: ['employee', 'manager', 'admin'],
+    },
+    {
       text: 'Admin Panel',
       icon: <AdminPanelSettings />,
       path: '/admin',

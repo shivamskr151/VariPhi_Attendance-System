@@ -1,6 +1,7 @@
 const express = require('express');
 const { body, query, validationResult } = require('express-validator');
 const Attendance = require('../models/Attendance');
+const Holiday = require('../models/Holiday');
 const { authenticateToken, canAccessEmployee } = require('../middleware/auth');
 const { asyncHandler, ValidationError } = require('../middleware/errorHandler');
 const { validateLocation } = require('../utils/geolocation');
@@ -65,6 +66,17 @@ router.post('/punch-in', punchInValidation, authenticateToken, asyncHandler(asyn
 
   const { location, device = 'web', notes } = req.body;
   const employeeId = req.employee._id;
+
+  // Check if today is a holiday
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const holiday = await Holiday.findOne({ date: { $gte: today, $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000) } });
+  if (holiday) {
+    return res.status(400).json({
+      success: false,
+      message: `Attendance cannot be marked on a holiday: ${holiday.name}`
+    });
+  }
 
   // Validate location (check if within allowed distance)
   const locationValidation = await validateLocation(location);
@@ -147,6 +159,17 @@ router.post('/punch-out', punchOutValidation, authenticateToken, asyncHandler(as
 
   const { location, device = 'web', notes } = req.body;
   const employeeId = req.employee._id;
+
+  // Check if today is a holiday
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const holiday = await Holiday.findOne({ date: { $gte: today, $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000) } });
+  if (holiday) {
+    return res.status(400).json({
+      success: false,
+      message: `Attendance cannot be marked on a holiday: ${holiday.name}`
+    });
+  }
 
   // Validate location
   const locationValidation = await validateLocation(location);

@@ -4,16 +4,18 @@ import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 
 const api: AxiosInstance = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5001/api',
   timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
-// Simple request interceptor to add auth token from localStorage
+// Add auth token and handle content type
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('accessToken');
+    // Only set JSON content type if no content type is specified and it's not FormData
+    if (!config.headers['Content-Type'] && !(config.data instanceof FormData)) {
+      config.headers['Content-Type'] = 'application/json';
+    }
     
+    // Add auth token
+    const token = localStorage.getItem('accessToken');
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -73,8 +75,13 @@ api.interceptors.response.use(
 
 // API service functions
 export const authAPI = {
-  login: (credentials: { email: string; password: string }) =>
+  login: (credentials: { email: string; password: string; twoFactorCode?: string }) =>
     api.post('/auth/login', credentials),
+  loginWith2FA: (credentials: { email: string; password: string; twoFactorCode: string }) =>
+    api.post('/auth/login', credentials),
+  setup2FA: () => api.post('/auth/2fa/setup'),
+  verify2FASetup: (code: string) => api.post('/auth/2fa/verify-setup', { code }),
+  disable2FA: (code: string) => api.post('/auth/2fa/disable', { code }),
   
   logout: () => api.post('/auth/logout'),
   
@@ -88,6 +95,12 @@ export const authAPI = {
   
   forgotPassword: (email: string) =>
     api.post('/auth/forgot-password', { email }),
+  
+  // Preferences endpoints
+  getPreferences: () => api.get('/users/preferences'),
+  updatePreferences: (preferences: any) => api.put('/users/preferences', preferences),
+  resetPreferences: (categories?: string[]) => api.post('/users/preferences/reset', { categories }),
+  getPreferencesSchema: () => api.get('/users/preferences/schema'),
 };
 
 export const attendanceAPI = {
@@ -206,6 +219,17 @@ export const adminAPI = {
   createBackup: () => api.post('/admin/backup'),
   
   restoreSystem: () => api.post('/admin/restore'),
+};
+
+export const configAPI = {
+  getPublicConfig: () => api.get('/config/public'),
+};
+
+export const holidaysAPI = {
+  getHolidays: () => api.get('/holidays'),
+  createHoliday: (holiday: { date: string; name: string; description?: string }) => api.post('/holidays', holiday),
+  updateHoliday: (id: string, holiday: { date: string; name: string; description?: string }) => api.put(`/holidays/${id}`, holiday),
+  deleteHoliday: (id: string) => api.delete(`/holidays/${id}`),
 };
 
 export { api }; 

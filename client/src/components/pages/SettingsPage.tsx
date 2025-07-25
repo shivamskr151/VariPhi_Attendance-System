@@ -70,6 +70,10 @@ import { User } from '../../types';
 import { api } from '../../services/api';
 import LoadingSpinner from '../common/LoadingSpinner';
 import ErrorAlert from '../common/ErrorAlert';
+import { authAPI } from '../../services/api';
+import PreferencesPanel from '../common/PreferencesPanel';
+import { PREFERENCE_CATEGORIES, PREFERENCE_FIELDS, DEFAULT_PREFERENCES } from '../../config/preferencesConfig';
+import { UserPreferences } from '../../types';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -136,22 +140,24 @@ const SettingsPage: React.FC = () => {
   });
 
   // Preferences States
-  const [preferences, setPreferences] = useState({
-    language: 'en',
-    theme: 'light',
-    timezone: user?.workSchedule?.timezone || 'UTC',
-    emailNotifications: true,
-    smsNotifications: false,
-    pushNotifications: true,
-    attendanceReminders: true,
-    leaveNotifications: true,
-    weeklyReports: false,
-    monthlyReports: true,
+  const [preferences, setPreferences] = useState<UserPreferences>(() => {
+    // Initialize with default preferences and merge with user preferences if available
+    const userPrefs = (user as any)?.preferences || {};
+    return { ...DEFAULT_PREFERENCES, ...userPrefs };
   });
+  const [showAdvancedPreferences, setShowAdvancedPreferences] = useState(false);
 
   // Account States
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
+
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(user?.twoFactorEnabled || false);
+  const [twoFactorSetup, setTwoFactorSetup] = useState<null | { qrCodeDataURL: string; secret: string }>(null);
+  const [twoFactorStep, setTwoFactorStep] = useState<'idle' | 'setup' | 'verify' | 'disabling'>('idle');
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [twoFactorLoading, setTwoFactorLoading] = useState(false);
+  const [twoFactorError, setTwoFactorError] = useState<string | null>(null);
+  const [twoFactorSuccess, setTwoFactorSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -173,6 +179,10 @@ const SettingsPage: React.FC = () => {
           phone: user.emergencyContact?.phone || '',
         },
       });
+
+      // Update preferences when user data changes
+      const userPrefs = (user as any)?.preferences || {};
+      setPreferences(prev => ({ ...prev, ...userPrefs }));
     }
   }, [user]);
 
@@ -228,9 +238,38 @@ const SettingsPage: React.FC = () => {
       const response = await api.put('/users/preferences', preferences);
       if (response.data.success) {
         setSuccess('Preferences updated successfully!');
+        // Refresh user data to get updated preferences
+        dispatch(checkAuthStatus());
       }
     } catch (error: any) {
-      setError(error.response?.data?.message || 'Failed to update preferences');
+      const errorMessage = error.response?.data?.message || 'Failed to update preferences';
+      const validationErrors = error.response?.data?.errors;
+      
+      if (validationErrors && Array.isArray(validationErrors)) {
+        setError(`Validation errors: ${validationErrors.join(', ')}`);
+      } else {
+        setError(errorMessage);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePreferencesChange = (newPreferences: Partial<UserPreferences>) => {
+    setPreferences(prev => ({ ...prev, ...newPreferences }));
+  };
+
+  const handleResetPreferences = async (categories?: string[]) => {
+    setLoading(true);
+    try {
+      const response = await api.post('/users/preferences/reset', { categories });
+      if (response.data.success) {
+        setPreferences(response.data.data.preferences);
+        setSuccess('Preferences reset successfully!');
+        dispatch(checkAuthStatus());
+      }
+    } catch (error: any) {
+      setError(error.response?.data?.message || 'Failed to reset preferences');
     } finally {
       setLoading(false);
     }
@@ -338,6 +377,53 @@ const SettingsPage: React.FC = () => {
       setError(error.response?.data?.message || 'Failed to delete profile picture');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleStart2FASetup = async () => {
+    setTwoFactorLoading(true);
+    setTwoFactorError(null);
+    try {
+      const res = await authAPI.setup2FA();
+      setTwoFactorSetup(res.data.data);
+      setTwoFactorStep('setup');
+    } catch (e: any) {
+      setTwoFactorError(e.response?.data?.message || 'Failed to start 2FA setup');
+    } finally {
+      setTwoFactorLoading(false);
+    }
+  };
+
+  const handleVerify2FASetup = async () => {
+    setTwoFactorLoading(true);
+    setTwoFactorError(null);
+    try {
+      await authAPI.verify2FASetup(twoFactorCode);
+      setTwoFactorEnabled(true);
+      setTwoFactorStep('idle');
+      setTwoFactorSuccess('Two-Factor Authentication enabled!');
+      setTwoFactorSetup(null);
+      setTwoFactorCode('');
+    } catch (e: any) {
+      setTwoFactorError(e.response?.data?.message || 'Invalid 2FA code');
+    } finally {
+      setTwoFactorLoading(false);
+    }
+  };
+
+  const handleDisable2FA = async () => {
+    setTwoFactorLoading(true);
+    setTwoFactorError(null);
+    try {
+      await authAPI.disable2FA(twoFactorCode);
+      setTwoFactorEnabled(false);
+      setTwoFactorStep('idle');
+      setTwoFactorSuccess('Two-Factor Authentication disabled.');
+      setTwoFactorCode('');
+    } catch (e: any) {
+      setTwoFactorError(e.response?.data?.message || 'Invalid 2FA code');
+    } finally {
+      setTwoFactorLoading(false);
     }
   };
 
@@ -811,6 +897,7 @@ const SettingsPage: React.FC = () => {
             </Card>
           </Grid>
 
+          {/* 2FA Section in Security Tab */}
           <Grid item xs={12} md={6}>
             <Card>
               <CardContent>
@@ -820,9 +907,84 @@ const SettingsPage: React.FC = () => {
                 <Typography variant="body2" color="text.secondary" paragraph>
                   Add an extra layer of security to your account by enabling two-factor authentication.
                 </Typography>
-                <Button variant="outlined" startIcon={<Security />}>
-                  Enable 2FA
-                </Button>
+                {twoFactorSuccess && <Alert severity="success" sx={{ mb: 2 }}>{twoFactorSuccess}</Alert>}
+                {twoFactorError && <Alert severity="error" sx={{ mb: 2 }}>{twoFactorError}</Alert>}
+                {twoFactorEnabled ? (
+                  <>
+                    <Alert severity="success" sx={{ mb: 2 }}>2FA is enabled on your account.</Alert>
+                    {twoFactorStep === 'disabling' ? (
+                      <>
+                        <TextField
+                          label="Enter 2FA code to disable"
+                          value={twoFactorCode}
+                          onChange={e => setTwoFactorCode(e.target.value)}
+                          fullWidth
+                          sx={{ mb: 2 }}
+                        />
+                        <Button
+                          variant="contained"
+                          color="error"
+                          onClick={handleDisable2FA}
+                          disabled={twoFactorLoading}
+                        >
+                          {twoFactorLoading ? <CircularProgress size={20} /> : 'Disable 2FA'}
+                        </Button>
+                        <Button
+                          variant="text"
+                          onClick={() => { setTwoFactorStep('idle'); setTwoFactorCode(''); }}
+                          sx={{ ml: 2 }}
+                        >
+                          Cancel
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        onClick={() => { setTwoFactorStep('disabling'); setTwoFactorCode(''); }}
+                      >
+                        Disable 2FA
+                      </Button>
+                    )}
+                  </>
+                ) : twoFactorStep === 'setup' && twoFactorSetup ? (
+                  <>
+                    <Typography gutterBottom>Scan this QR code with your authenticator app:</Typography>
+                    <Box sx={{ textAlign: 'center', mb: 2 }}>
+                      <img src={twoFactorSetup.qrCodeDataURL} alt="2FA QR Code" style={{ maxWidth: 200 }} />
+                    </Box>
+                    <TextField
+                      label="Enter 6-digit code from app"
+                      value={twoFactorCode}
+                      onChange={e => setTwoFactorCode(e.target.value)}
+                      fullWidth
+                      sx={{ mb: 2 }}
+                    />
+                    <Button
+                      variant="contained"
+                      onClick={handleVerify2FASetup}
+                      disabled={twoFactorLoading}
+                    >
+                      {twoFactorLoading ? <CircularProgress size={20} /> : 'Verify & Enable 2FA'}
+                    </Button>
+                    <Button
+                      variant="text"
+                      onClick={() => { setTwoFactorStep('idle'); setTwoFactorSetup(null); setTwoFactorCode(''); }}
+                      sx={{ ml: 2 }}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="outlined"
+                    startIcon={<Security />}
+                    onClick={handleStart2FASetup}
+                    disabled={twoFactorLoading}
+                  >
+                    {twoFactorLoading ? <CircularProgress size={20} /> : 'Enable 2FA'}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           </Grid>
@@ -833,182 +995,40 @@ const SettingsPage: React.FC = () => {
       <TabPanel value={tabValue} index={2}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Typography variant="h6">Preferences</Typography>
-          <Button
-            variant="contained"
-            startIcon={<Save />}
-            onClick={handleUpdatePreferences}
-            disabled={loading}
-          >
-            {loading ? <CircularProgress size={20} /> : 'Save Preferences'}
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={showAdvancedPreferences}
+                  onChange={(e) => setShowAdvancedPreferences(e.target.checked)}
+                  size="small"
+                />
+              }
+              label="Show Advanced"
+              sx={{ mr: 2 }}
+            />
+            <Button
+              variant="outlined"
+              onClick={() => handleResetPreferences()}
+              disabled={loading}
+              size="small"
+            >
+              Reset All
+            </Button>
+          </Box>
         </Box>
 
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  General Settings
-                </Typography>
-                <List>
-                  <ListItem>
-                    <ListItemIcon>
-                      <Language />
-                    </ListItemIcon>
-                    <ListItemText primary="Language" />
-                    <FormControl size="small" sx={{ minWidth: 120 }}>
-                      <Select
-                        value={preferences.language}
-                        onChange={(e) =>
-                          setPreferences({ ...preferences, language: e.target.value })
-                        }
-                      >
-                        <MenuItem value="en">English</MenuItem>
-                        <MenuItem value="es">Spanish</MenuItem>
-                        <MenuItem value="fr">French</MenuItem>
-                        <MenuItem value="de">German</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </ListItem>
-                  <ListItem>
-                    <ListItemIcon>
-                      <Palette />
-                    </ListItemIcon>
-                    <ListItemText primary="Theme" />
-                    <FormControl size="small" sx={{ minWidth: 120 }}>
-                      <Select
-                        value={preferences.theme}
-                        onChange={(e) =>
-                          setPreferences({ ...preferences, theme: e.target.value })
-                        }
-                      >
-                        <MenuItem value="light">Light</MenuItem>
-                        <MenuItem value="dark">Dark</MenuItem>
-                        <MenuItem value="auto">Auto</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </ListItem>
-                  <ListItem>
-                    <ListItemIcon>
-                      <CalendarToday />
-                    </ListItemIcon>
-                    <ListItemText primary="Timezone" />
-                    <FormControl size="small" sx={{ minWidth: 120 }}>
-                      <Select
-                        value={preferences.timezone}
-                        onChange={(e) =>
-                          setPreferences({ ...preferences, timezone: e.target.value })
-                        }
-                      >
-                        <MenuItem value="UTC">UTC</MenuItem>
-                        <MenuItem value="EST">EST</MenuItem>
-                        <MenuItem value="PST">PST</MenuItem>
-                        <MenuItem value="GMT">GMT</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </ListItem>
-                </List>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Notifications
-                </Typography>
-                <List>
-                  <ListItem>
-                    <ListItemIcon>
-                      <Email />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary="Email Notifications"
-                      secondary="Receive notifications via email"
-                    />
-                    <ListItemSecondaryAction>
-                      <Switch
-                        checked={preferences.emailNotifications}
-                        onChange={(e) =>
-                          setPreferences({ ...preferences, emailNotifications: e.target.checked })
-                        }
-                      />
-                    </ListItemSecondaryAction>
-                  </ListItem>
-                  <ListItem>
-                    <ListItemIcon>
-                      <Phone />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary="SMS Notifications"
-                      secondary="Receive notifications via SMS"
-                    />
-                    <ListItemSecondaryAction>
-                      <Switch
-                        checked={preferences.smsNotifications}
-                        onChange={(e) =>
-                          setPreferences({ ...preferences, smsNotifications: e.target.checked })
-                        }
-                      />
-                    </ListItemSecondaryAction>
-                  </ListItem>
-                  <ListItem>
-                    <ListItemIcon>
-                      <NotificationsActive />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary="Push Notifications"
-                      secondary="Receive push notifications"
-                    />
-                    <ListItemSecondaryAction>
-                      <Switch
-                        checked={preferences.pushNotifications}
-                        onChange={(e) =>
-                          setPreferences({ ...preferences, pushNotifications: e.target.checked })
-                        }
-                      />
-                    </ListItemSecondaryAction>
-                  </ListItem>
-                  <ListItem>
-                    <ListItemIcon>
-                      <Schedule />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary="Attendance Reminders"
-                      secondary="Get reminded to punch in/out"
-                    />
-                    <ListItemSecondaryAction>
-                      <Switch
-                        checked={preferences.attendanceReminders}
-                        onChange={(e) =>
-                          setPreferences({ ...preferences, attendanceReminders: e.target.checked })
-                        }
-                      />
-                    </ListItemSecondaryAction>
-                  </ListItem>
-                  <ListItem>
-                    <ListItemIcon>
-                      <EventNote />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary="Leave Notifications"
-                      secondary="Get notified about leave requests"
-                    />
-                    <ListItemSecondaryAction>
-                      <Switch
-                        checked={preferences.leaveNotifications}
-                        onChange={(e) =>
-                          setPreferences({ ...preferences, leaveNotifications: e.target.checked })
-                        }
-                      />
-                    </ListItemSecondaryAction>
-                  </ListItem>
-                </List>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+        <PreferencesPanel
+          preferences={preferences}
+          onPreferencesChange={handlePreferencesChange}
+          onSave={handleUpdatePreferences}
+          loading={loading}
+          error={error}
+          success={success}
+          categories={PREFERENCE_CATEGORIES}
+          fields={PREFERENCE_FIELDS}
+          showAdvanced={showAdvancedPreferences}
+        />
       </TabPanel>
 
       {/* Account Tab */}

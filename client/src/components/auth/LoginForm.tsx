@@ -16,6 +16,8 @@ import { useNavigate } from 'react-router-dom';
 import { RootState, AppDispatch } from '../../store';
 import { login, clearError } from '../../store/slices/authSlice';
 import { useAppDispatch } from '../../hooks/useAppDispatch';
+import { authAPI } from '../../services/api';
+import { configAPI } from '../../services/api';
 
 const LoginForm: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -33,6 +35,16 @@ const LoginForm: React.FC = () => {
     email?: string;
     password?: string;
   }>({});
+  const [twoFactorRequired, setTwoFactorRequired] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [twoFactorError, setTwoFactorError] = useState<string | null>(null);
+  const [publicConfig, setPublicConfig] = useState<{ adminContact: string; selfRegistrationEnabled: boolean } | null>(null);
+
+  useEffect(() => {
+    configAPI.getPublicConfig()
+      .then(res => setPublicConfig(res.data.data))
+      .catch(() => setPublicConfig({ adminContact: 'information@variphi.com', selfRegistrationEnabled: false }));
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -87,13 +99,35 @@ const LoginForm: React.FC = () => {
     if (!validateForm()) {
       return;
     }
-
+    setTwoFactorError(null);
     try {
-      await dispatch(login(formData)).unwrap();
-      navigate('/dashboard');
-    } catch (error) {
-      // Error is handled by the Redux slice
-      console.error('Login failed:', error);
+      if (!twoFactorRequired) {
+        // First attempt: try login with email/password
+        const res = await authAPI.login(formData);
+        if (res.data?.data?.accessToken) {
+          // Success, dispatch login
+          await dispatch(login({ ...formData, twoFactorCode: undefined })).unwrap();
+          navigate('/dashboard');
+          return;
+        } else if (res.data?.data?.twoFactorRequired || res.data?.twoFactorRequired) {
+          setTwoFactorRequired(true);
+          return;
+        } else {
+          setTwoFactorError(res.data?.message || 'Login failed');
+        }
+      } else {
+        // 2FA required: try login with code
+        const res = await authAPI.login({ ...formData, twoFactorCode });
+        if (res.data?.data?.accessToken) {
+          await dispatch(login({ ...formData, twoFactorCode })).unwrap();
+          navigate('/dashboard');
+          return;
+        } else {
+          setTwoFactorError(res.data?.message || 'Invalid 2FA code');
+        }
+      }
+    } catch (error: any) {
+      setTwoFactorError(error.response?.data?.message || 'Login failed');
     }
   };
 
@@ -122,6 +156,11 @@ const LoginForm: React.FC = () => {
         }}
       >
         <Box textAlign="center" mb={3}>
+          <img
+            src={process.env.PUBLIC_URL + '/Variphi-logo.png'}
+            alt="Variphi Logo"
+            style={{ width: 120, marginBottom: 16 }}
+          />
           <Typography variant="h4" component="h1" gutterBottom>
             Welcome Back
           </Typography>
@@ -130,9 +169,14 @@ const LoginForm: React.FC = () => {
           </Typography>
         </Box>
 
-        {error && (
+        {error && !twoFactorRequired && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
+          </Alert>
+        )}
+        {twoFactorError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {twoFactorError}
           </Alert>
         )}
 
@@ -188,6 +232,27 @@ const LoginForm: React.FC = () => {
             disabled={loading}
           />
 
+          {twoFactorRequired && (
+            <TextField
+              fullWidth
+              label="2FA Code"
+              name="twoFactorCode"
+              type="text"
+              value={twoFactorCode}
+              onChange={e => setTwoFactorCode(e.target.value)}
+              error={!!twoFactorError}
+              helperText={twoFactorError}
+              margin="normal"
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Lock color="action" />
+                  </InputAdornment>
+                ),
+              }}
+            />
+          )}
+
           <Button
             type="submit"
             fullWidth
@@ -213,9 +278,14 @@ const LoginForm: React.FC = () => {
         </Box>
 
         <Box textAlign="center" mt={2}>
-          <Typography variant="body2" color="text.secondary">
-            Don't have an account? Contact your administrator
-          </Typography>
+          {publicConfig && !publicConfig.selfRegistrationEnabled && (
+            <Typography variant="body2" color="text.secondary">
+              Don't have an account?{' '}
+              <a href={`mailto:${publicConfig.adminContact}`} style={{ color: '#1976d2', textDecoration: 'underline' }}>
+                Contact your administrator
+              </a>
+            </Typography>
+          )}
         </Box>
       </Paper>
     </Box>

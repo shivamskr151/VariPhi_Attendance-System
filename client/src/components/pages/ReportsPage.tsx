@@ -214,7 +214,7 @@ const ReportsPage: React.FC = () => {
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `${type}-report-${new Date().toISOString().split('T')[0]}.xlsx`);
+      link.setAttribute('download', `${type}-report-${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -222,7 +222,25 @@ const ReportsPage: React.FC = () => {
 
       setSuccess(`${type.charAt(0).toUpperCase() + type.slice(1)} report exported successfully!`);
     } catch (error: any) {
-      setError(`Failed to export ${type} report`);
+      let errorMsg = `Failed to export ${type} report`;
+      if (error?.response?.data) {
+        try {
+          // Try to parse error message from blob
+          const reader = new FileReader();
+          reader.onload = () => {
+            try {
+              const json = JSON.parse(reader.result as string);
+              if (json.message) setError(`${errorMsg}: ${json.message}`);
+              else setError(errorMsg);
+            } catch {
+              setError(errorMsg);
+            }
+          };
+          reader.readAsText(error.response.data);
+          return;
+        } catch {}
+      }
+      setError(errorMsg);
     }
   };
 

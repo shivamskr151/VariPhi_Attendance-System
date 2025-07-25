@@ -41,6 +41,8 @@ export interface User {
   emailVerified: boolean;
   createdAt: string;
   updatedAt: string;
+  twoFactorEnabled?: boolean;
+  preferences?: UserPreferences;
 }
 
 // Attendance Types
@@ -188,6 +190,7 @@ export interface PaginatedResponse<T> {
 export interface LoginForm {
   email: string;
   password: string;
+  twoFactorCode?: string;
 }
 
 export interface LeaveRequestForm {
@@ -305,6 +308,145 @@ export interface LoadingState {
   [key: string]: boolean;
 }
 
+// Preferences Types
+export interface PreferenceOption {
+  value: string | number | boolean;
+  label: string;
+  description?: string;
+  disabled?: boolean;
+}
+
+export interface PreferenceField {
+  key: string;
+  label: string;
+  description?: string;
+  type: 'select' | 'switch' | 'number' | 'text' | 'time' | 'multiselect' | 'color' | 'slider';
+  options?: PreferenceOption[];
+  min?: number;
+  max?: number;
+  step?: number;
+  defaultValue: any;
+  validation?: {
+    required?: boolean;
+    pattern?: string;
+    message?: string;
+  };
+  dependsOn?: {
+    field: string;
+    value: any;
+  };
+  category: string;
+  subcategory?: string;
+  icon?: string;
+  advanced?: boolean;
+}
+
+export interface PreferenceCategory {
+  key: string;
+  label: string;
+  description?: string;
+  icon: string;
+  subcategories?: Array<{
+    key: string;
+    label: string;
+    description?: string;
+  }>;
+}
+
+export interface UserPreferences {
+  // General Settings
+  language: string;
+  theme: string;
+  timezone: string;
+  dateFormat: string;
+  timeFormat: string;
+  currency: string;
+  numberFormat: string;
+  
+  // Display Settings
+  dashboardLayout: string;
+  sidebarCollapsed: boolean;
+  compactMode: boolean;
+  showTooltips: boolean;
+  animationsEnabled: boolean;
+  highContrast: boolean;
+  fontSize: number;
+  
+  // Notification Settings
+  emailNotifications: boolean;
+  smsNotifications: boolean;
+  pushNotifications: boolean;
+  browserNotifications: boolean;
+  soundEnabled: boolean;
+  notificationSound: string;
+  
+  // Attendance Settings
+  attendanceReminders: boolean;
+  reminderTime: string;
+  autoBreakDeduction: boolean;
+  breakDuration: number;
+  overtimeNotifications: boolean;
+  lateArrivalNotifications: boolean;
+  earlyDepartureNotifications: boolean;
+  weekendReminders: boolean;
+  holidayReminders: boolean;
+  
+  // Leave Settings
+  leaveNotifications: boolean;
+  leaveApprovalNotifications: boolean;
+  leaveRejectionNotifications: boolean;
+  leaveBalanceReminders: boolean;
+  lowBalanceThreshold: number;
+  autoSubmitLeaveRequests: boolean;
+  
+  // Report Settings
+  weeklyReports: boolean;
+  monthlyReports: boolean;
+  reportFormat: string;
+  reportDelivery: string;
+  includeCharts: boolean;
+  reportLanguage: string;
+  
+  // Privacy Settings
+  profileVisibility: string;
+  shareAttendanceData: boolean;
+  shareLeaveData: boolean;
+  allowManagerAccess: boolean;
+  twoFactorReminders: boolean;
+  
+  // Advanced Settings
+  enableBetaFeatures: boolean;
+  enableDebugMode: boolean;
+  dataRetentionPeriod: number;
+  autoLogout: boolean;
+  autoLogoutTime: number;
+  sessionTimeout: number;
+  
+  // Mobile Settings
+  locationTracking: boolean;
+  backgroundSync: boolean;
+  offlineMode: boolean;
+  biometricLogin: boolean;
+  quickActions: string[];
+  
+  // Integration Settings
+  calendarSync: boolean;
+  calendarProvider: string;
+  slackIntegration: boolean;
+  teamsIntegration: boolean;
+  webhookUrl: string;
+  
+  // Accessibility Settings
+  screenReader: boolean;
+  keyboardNavigation: boolean;
+  reducedMotion: boolean;
+  colorBlindMode: string;
+  largeText: boolean;
+  
+  // Custom Settings (extensible)
+  customSettings: Record<string, any>;
+}
+
 // Filter Types
 export interface AttendanceFilter {
   startDate?: string;
@@ -326,4 +468,12 @@ export interface EmployeeFilter {
   role?: string;
   isActive?: boolean;
   search?: string;
+} 
+
+// Holiday Type
+export interface Holiday {
+  _id?: string; // MongoDB document ID, optional for frontend creation
+  date: string; // ISO date string
+  name: string;
+  description?: string;
 } 

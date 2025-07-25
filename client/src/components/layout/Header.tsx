@@ -92,9 +92,23 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           </IconButton>
         )}
 
-        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          VariPhi Attendance System
-        </Typography>
+        {/* Variphi Logo */}
+        <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
+          <a href="/dashboard">
+            <img
+              src={process.env.PUBLIC_URL + '/Variphi-logo.png'}
+              alt="Variphi Logo"
+              style={{ height: 40, width: 'auto', marginRight: 12 }}
+            />
+          </a>
+        </Box>
+
+        {/* Centered Title */}
+        <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center' }}>
+          <Typography variant="h6" component="div" align="center">
+            VariPhi Attendance System
+          </Typography>
+        </Box>
 
         {isAuthenticated && user && (
           <Box display="flex" alignItems="center" gap={1}>

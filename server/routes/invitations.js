@@ -34,7 +34,7 @@ const sendInvitationValidation = [
     .isIn(['employee', 'manager', 'admin'])
     .withMessage('Please select a valid role'),
   body('phone')
-    .optional()
+    .optional({ checkFalsy: true })
     .trim()
     .isLength({ min: 10 })
     .withMessage('Please provide a valid phone number')

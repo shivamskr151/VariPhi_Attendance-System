@@ -260,7 +260,7 @@ const AcceptInvitationPage: React.FC = () => {
         <Box sx={{ textAlign: 'center', mb: 3 }}>
           <CheckCircleIcon color="success" sx={{ fontSize: 64, mb: 2 }} />
           <Typography variant="h4" gutterBottom>
-            Welcome to Attendance System
+            Welcome to VariPhi Attendance System
           </Typography>
           <Typography variant="body1" color="textSecondary">
             Complete your account setup to get started

@@ -30,6 +30,22 @@ const employeeSchema = new mongoose.Schema({
     required: true,
     minlength: 6
   },
+  // 2FA fields
+  twoFactorEnabled: {
+    type: Boolean,
+    default: false
+  },
+  twoFactorSecret: {
+    type: String,
+    default: null
+  },
+  twoFactorTempSecret: {
+    type: String,
+    default: null
+  },
+  backupCodes: [{
+    type: String
+  }],
   phone: {
     type: String,
     required: false,
@@ -111,16 +127,97 @@ const employeeSchema = new mongoose.Schema({
     default: false
   },
   preferences: {
+    // General Settings
     language: { type: String, default: 'en' },
     theme: { type: String, default: 'light' },
     timezone: { type: String, default: 'UTC' },
+    dateFormat: { type: String, default: 'MM/DD/YYYY' },
+    timeFormat: { type: String, default: '12' },
+    currency: { type: String, default: 'USD' },
+    numberFormat: { type: String, default: 'US' },
+    
+    // Display Settings
+    dashboardLayout: { type: String, default: 'grid' },
+    sidebarCollapsed: { type: Boolean, default: false },
+    compactMode: { type: Boolean, default: false },
+    showTooltips: { type: Boolean, default: true },
+    animationsEnabled: { type: Boolean, default: true },
+    highContrast: { type: Boolean, default: false },
+    fontSize: { type: Number, default: 14, min: 12, max: 20 },
+    
+    // Notification Settings
     emailNotifications: { type: Boolean, default: true },
     smsNotifications: { type: Boolean, default: false },
     pushNotifications: { type: Boolean, default: true },
+    browserNotifications: { type: Boolean, default: true },
+    soundEnabled: { type: Boolean, default: true },
+    notificationSound: { type: String, default: 'default' },
+    
+    // Attendance Settings
     attendanceReminders: { type: Boolean, default: true },
+    reminderTime: { type: String, default: '08:45' },
+    autoBreakDeduction: { type: Boolean, default: true },
+    breakDuration: { type: Number, default: 60, min: 15, max: 120 },
+    overtimeNotifications: { type: Boolean, default: true },
+    lateArrivalNotifications: { type: Boolean, default: true },
+    earlyDepartureNotifications: { type: Boolean, default: true },
+    weekendReminders: { type: Boolean, default: false },
+    holidayReminders: { type: Boolean, default: false },
+    
+    // Leave Settings
     leaveNotifications: { type: Boolean, default: true },
+    leaveApprovalNotifications: { type: Boolean, default: true },
+    leaveRejectionNotifications: { type: Boolean, default: true },
+    leaveBalanceReminders: { type: Boolean, default: true },
+    lowBalanceThreshold: { type: Number, default: 5, min: 1, max: 30 },
+    autoSubmitLeaveRequests: { type: Boolean, default: false },
+    
+    // Report Settings
     weeklyReports: { type: Boolean, default: false },
-    monthlyReports: { type: Boolean, default: true }
+    monthlyReports: { type: Boolean, default: true },
+    reportFormat: { type: String, default: 'pdf' },
+    reportDelivery: { type: String, default: 'email' },
+    includeCharts: { type: Boolean, default: true },
+    reportLanguage: { type: String, default: 'en' },
+    
+    // Privacy Settings
+    profileVisibility: { type: String, default: 'team' },
+    shareAttendanceData: { type: Boolean, default: true },
+    shareLeaveData: { type: Boolean, default: true },
+    allowManagerAccess: { type: Boolean, default: true },
+    twoFactorReminders: { type: Boolean, default: true },
+    
+    // Advanced Settings
+    enableBetaFeatures: { type: Boolean, default: false },
+    enableDebugMode: { type: Boolean, default: false },
+    dataRetentionPeriod: { type: Number, default: 24, min: 12, max: 84 },
+    autoLogout: { type: Boolean, default: true },
+    autoLogoutTime: { type: Number, default: 30, min: 5, max: 480 },
+    sessionTimeout: { type: Number, default: 24, min: 1, max: 168 },
+    
+    // Mobile Settings
+    locationTracking: { type: Boolean, default: true },
+    backgroundSync: { type: Boolean, default: true },
+    offlineMode: { type: Boolean, default: true },
+    biometricLogin: { type: Boolean, default: false },
+    quickActions: [{ type: String }],
+    
+    // Integration Settings
+    calendarSync: { type: Boolean, default: false },
+    calendarProvider: { type: String, default: 'google' },
+    slackIntegration: { type: Boolean, default: false },
+    teamsIntegration: { type: Boolean, default: false },
+    webhookUrl: { type: String, default: '' },
+    
+    // Accessibility Settings
+    screenReader: { type: Boolean, default: false },
+    keyboardNavigation: { type: Boolean, default: false },
+    reducedMotion: { type: Boolean, default: false },
+    colorBlindMode: { type: String, default: 'none' },
+    largeText: { type: Boolean, default: false },
+    
+    // Custom Settings (extensible)
+    customSettings: { type: Map, of: mongoose.Schema.Types.Mixed, default: {} }
   },
   deletedAt: {
     type: Date,

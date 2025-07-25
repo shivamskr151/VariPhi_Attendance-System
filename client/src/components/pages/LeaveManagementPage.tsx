@@ -60,6 +60,8 @@ import { getCurrentEmployee } from '../../store/slices/employeeSlice';
 import { Leave, LeaveRequestForm, LeaveFilter } from '../../types';
 import LoadingSpinner from '../common/LoadingSpinner';
 import ErrorAlert from '../common/ErrorAlert';
+import { holidaysAPI } from '../../services/api';
+import { Holiday } from '../../types';
 
 const LeaveManagementPage: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -96,6 +98,14 @@ const LeaveManagementPage: React.FC = () => {
     priority: 'medium',
   });
 
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [holidaysLoading, setHolidaysLoading] = useState(false);
+  const [holidaysError, setHolidaysError] = useState<string | null>(null);
+  const [editingHoliday, setEditingHoliday] = useState<Holiday | null>(null);
+  const [showHolidayDialog, setShowHolidayDialog] = useState(false);
+  const [holidayForm, setHolidayForm] = useState<{date: string; name: string; description?: string}>({ date: '', name: '', description: '' });
+  const [isHolidaySubmitting, setIsHolidaySubmitting] = useState(false);
+
   useEffect(() => {
     if (user) {
       fetchLeaves();
@@ -113,6 +123,15 @@ const LeaveManagementPage: React.FC = () => {
 
     return () => clearInterval(refreshTimer);
   }, [user]);
+
+  // Fetch holidays from backend
+  useEffect(() => {
+    setHolidaysLoading(true);
+    holidaysAPI.getHolidays()
+      .then(res => setHolidays(res.data.data))
+      .catch(err => setHolidaysError(err.response?.data?.message || 'Failed to load holidays'))
+      .finally(() => setHolidaysLoading(false));
+  }, []);
 
   const fetchLeaves = async () => {
     try {
@@ -222,6 +241,58 @@ const LeaveManagementPage: React.FC = () => {
       halfDayType: 'morning',
       priority: 'medium',
     });
+  };
+
+  const handleOpenHolidayDialog = (holiday?: Holiday) => {
+    if (holiday) {
+      setEditingHoliday(holiday);
+      setHolidayForm({ date: holiday.date.slice(0, 10), name: holiday.name, description: holiday.description });
+    } else {
+      setEditingHoliday(null);
+      setHolidayForm({ date: '', name: '', description: '' });
+    }
+    setShowHolidayDialog(true);
+  };
+
+  const handleCloseHolidayDialog = () => {
+    setShowHolidayDialog(false);
+    setEditingHoliday(null);
+    setHolidayForm({ date: '', name: '', description: '' });
+  };
+
+  const handleHolidayFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setHolidayForm({ ...holidayForm, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmitHoliday = async () => {
+    setIsHolidaySubmitting(true);
+    try {
+      if (editingHoliday && editingHoliday._id) {
+        // Update
+        const res = await holidaysAPI.updateHoliday(editingHoliday._id, holidayForm);
+        setHolidays(holidays.map(h => h._id === editingHoliday._id ? res.data.data : h));
+      } else if (!editingHoliday) {
+        // Create
+        const res = await holidaysAPI.createHoliday(holidayForm);
+        setHolidays([...holidays, res.data.data]);
+      }
+      handleCloseHolidayDialog();
+    } catch (err: any) {
+      setHolidaysError(err.response?.data?.message || 'Failed to save holiday');
+    } finally {
+      setIsHolidaySubmitting(false);
+    }
+  };
+
+  const handleDeleteHoliday = async (id?: string) => {
+    if (!id) return;
+    if (!window.confirm('Delete this holiday?')) return;
+    try {
+      await holidaysAPI.deleteHoliday(id);
+      setHolidays(holidays.filter(h => h._id !== id));
+    } catch (err: any) {
+      setHolidaysError(err.response?.data?.message || 'Failed to delete holiday');
+    }
   };
 
   const getStatusChip = (status: string) => {
@@ -456,6 +527,98 @@ const LeaveManagementPage: React.FC = () => {
             </Card>
           </Grid>
         </Grid>
+
+        {/* Official Holidays Card */}
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Box display="flex" alignItems="center" justifyContent="space-between">
+              <Typography variant="h6" gutterBottom>
+                Official Holidays
+              </Typography>
+              {user?.role === 'admin' && (
+                <Button size="small" variant="outlined" onClick={() => handleOpenHolidayDialog()}>
+                  Add Holiday
+                </Button>
+              )}
+            </Box>
+            {holidaysLoading ? (
+              <CircularProgress size={24} />
+            ) : holidaysError ? (
+              <Alert severity="error">{holidaysError}</Alert>
+            ) : holidays.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No official holidays defined.
+              </Typography>
+            ) : (
+              <Box component="ul" sx={{ pl: 2, mb: 0 }}>
+                {holidays.map((holiday: Holiday) => (
+                  <li key={holiday._id} style={{ marginBottom: 8 }}>
+                    <Typography variant="body1" component="span" sx={{ fontWeight: 500 }}>
+                      {new Date(holiday.date).toLocaleDateString()} - {holiday.name}
+                    </Typography>
+                    {holiday.description && (
+                      <Typography variant="body2" color="text.secondary" component="span" sx={{ ml: 1 }}>
+                        ({holiday.description})
+                      </Typography>
+                    )}
+                    {user?.role === 'admin' && (
+                      <>
+                        <Button size="small" onClick={() => handleOpenHolidayDialog(holiday)} sx={{ ml: 1 }}>Edit</Button>
+                        <Button
+                          size="small"
+                          color="error"
+                          onClick={() => holiday._id && handleDeleteHoliday(holiday._id)}
+                          sx={{ ml: 1 }}
+                          disabled={!holiday._id}
+                        >
+                          Delete
+                        </Button>
+                      </>
+                    )}
+                  </li>
+                ))}
+              </Box>
+            )}
+            {/* Holiday Add/Edit Dialog */}
+            <Dialog open={showHolidayDialog} onClose={handleCloseHolidayDialog} maxWidth="xs" fullWidth>
+              <DialogTitle>{editingHoliday ? 'Edit Holiday' : 'Add Holiday'}</DialogTitle>
+              <DialogContent>
+                <TextField
+                  label="Date"
+                  name="date"
+                  type="date"
+                  value={holidayForm.date}
+                  onChange={handleHolidayFormChange}
+                  fullWidth
+                  margin="normal"
+                  InputLabelProps={{ shrink: true }}
+                />
+                <TextField
+                  label="Name"
+                  name="name"
+                  value={holidayForm.name}
+                  onChange={handleHolidayFormChange}
+                  fullWidth
+                  margin="normal"
+                />
+                <TextField
+                  label="Description"
+                  name="description"
+                  value={holidayForm.description}
+                  onChange={handleHolidayFormChange}
+                  fullWidth
+                  margin="normal"
+                />
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={handleCloseHolidayDialog}>Cancel</Button>
+                <Button onClick={handleSubmitHoliday} variant="contained" disabled={isHolidaySubmitting}>
+                  {isHolidaySubmitting ? <CircularProgress size={20} /> : 'Save'}
+                </Button>
+              </DialogActions>
+            </Dialog>
+          </CardContent>
+        </Card>
 
         {/* Leave Balance Card */}
         <Card sx={{ mb: 3 }}>

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { isWorkingDay } = require('../utils/geolocation');
 
 const leaveSchema = new mongoose.Schema({
   employee: {
@@ -117,14 +118,16 @@ leaveSchema.virtual('statusColor').get(function() {
 // Pre-save middleware to calculate total days
 leaveSchema.pre('save', function(next) {
   if (this.startDate && this.endDate) {
-    const diffTime = Math.abs(this.endDate - this.startDate);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    
-    if (this.isHalfDay) {
-      this.totalDays = diffDays * 0.5;
-    } else {
-      this.totalDays = diffDays;
+    let diffDays = 0;
+    let current = new Date(this.startDate);
+    const end = new Date(this.endDate);
+    while (current <= end) {
+      if (isWorkingDay(current)) {
+        diffDays += this.isHalfDay ? 0.5 : 1;
+      }
+      current.setDate(current.getDate() + 1);
     }
+    this.totalDays = diffDays;
   }
   next();
 });
