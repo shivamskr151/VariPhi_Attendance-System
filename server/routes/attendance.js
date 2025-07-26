@@ -8,6 +8,37 @@ const { validateLocation } = require('../utils/geolocation');
 
 const router = express.Router();
 
+// Working hours validation function
+const isWithinWorkingHours = () => {
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+  
+  // Convert current time to minutes for easier comparison
+  const currentTimeInMinutes = currentHour * 60 + currentMinute;
+  
+  // Working hours: 9:00 AM (540 minutes) to 6:00 PM (1080 minutes)
+  const workStartMinutes = 9 * 60; // 9:00 AM
+  const workEndMinutes = 18 * 60;  // 6:00 PM
+  
+  return currentTimeInMinutes >= workStartMinutes && currentTimeInMinutes <= workEndMinutes;
+};
+
+// Get working hours message
+const getWorkingHoursMessage = () => {
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+  
+  if (currentHour < 9) {
+    return 'Punch in is only allowed during official working hours (9:00 AM to 6:00 PM). Please try again at 9:00 AM.';
+  } else if (currentHour >= 18) {
+    return 'Punch in is only allowed during official working hours (9:00 AM to 6:00 PM). Working hours have ended for today.';
+  }
+  
+  return 'Punch in is only allowed during official working hours (9:00 AM to 6:00 PM).';
+};
+
 // Validation rules
 const punchInValidation = [
   body('location.latitude')
@@ -75,6 +106,14 @@ router.post('/punch-in', punchInValidation, authenticateToken, asyncHandler(asyn
     return res.status(400).json({
       success: false,
       message: `Attendance cannot be marked on a holiday: ${holiday.name}`
+    });
+  }
+
+  // Check if within working hours (9:00 AM to 6:00 PM)
+  if (!isWithinWorkingHours()) {
+    return res.status(400).json({
+      success: false,
+      message: getWorkingHoursMessage()
     });
   }
 
@@ -168,6 +207,20 @@ router.post('/punch-out', punchOutValidation, authenticateToken, asyncHandler(as
     return res.status(400).json({
       success: false,
       message: `Attendance cannot be marked on a holiday: ${holiday.name}`
+    });
+  }
+
+  // Check if within working hours for punch out (should be after 9:00 AM)
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+  const currentTimeInMinutes = currentHour * 60 + currentMinute;
+  const workStartMinutes = 9 * 60; // 9:00 AM
+  
+  if (currentTimeInMinutes < workStartMinutes) {
+    return res.status(400).json({
+      success: false,
+      message: 'Punch out is only allowed after official working hours begin (9:00 AM). Please try again after 9:00 AM.'
     });
   }
 

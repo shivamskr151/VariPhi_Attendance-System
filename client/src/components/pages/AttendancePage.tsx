@@ -83,6 +83,7 @@ const AttendancePage: React.FC = () => {
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [holidaysLoading, setHolidaysLoading] = useState(false);
   const [holidaysError, setHolidaysError] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
 
   useEffect(() => {
     if (user) {
@@ -93,6 +94,15 @@ const AttendancePage: React.FC = () => {
       console.log('No user logged in, skipping attendance data fetch');
     }
   }, [filters, user]);
+
+  // Real-time clock update
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     setHolidaysLoading(true);
@@ -270,6 +280,32 @@ const AttendancePage: React.FC = () => {
     }
   };
 
+  const isWithinWorkingHours = () => {
+    const currentHour = currentTime.getHours();
+    const currentMinute = currentTime.getMinutes();
+    const currentTimeInMinutes = currentHour * 60 + currentMinute;
+    
+    // Working hours: 9:00 AM (540 minutes) to 6:00 PM (1080 minutes)
+    const workStartMinutes = 9 * 60; // 9:00 AM
+    const workEndMinutes = 18 * 60;  // 6:00 PM
+    
+    return currentTimeInMinutes >= workStartMinutes && currentTimeInMinutes <= workEndMinutes;
+  };
+
+  const getWorkingHoursStatus = () => {
+    const currentHour = currentTime.getHours();
+    const currentMinute = currentTime.getMinutes();
+    const currentTimeInMinutes = currentHour * 60 + currentMinute;
+    
+    if (currentTimeInMinutes < 9 * 60) {
+      return { status: 'before', message: 'Working hours start at 9:00 AM' };
+    } else if (currentTimeInMinutes > 18 * 60) {
+      return { status: 'after', message: 'Working hours ended at 6:00 PM' };
+    } else {
+      return { status: 'within', message: 'Within working hours (9:00 AM - 6:00 PM)' };
+    }
+  };
+
   if (loading) {
     return <LoadingSpinner />;
   }
@@ -331,6 +367,23 @@ const AttendancePage: React.FC = () => {
             <Typography variant="h6" gutterBottom>
               Today's Attendance
             </Typography>
+            
+            {/* Working Hours Status */}
+            <Box display="flex" alignItems="center" justifyContent="center" mb={2}>
+              {(() => {
+                const workingStatus = getWorkingHoursStatus();
+                const color = workingStatus.status === 'within' ? 'success' : 'warning';
+                return (
+                  <Chip
+                    icon={<Schedule />}
+                    label={workingStatus.message}
+                    color={color as any}
+                    size="small"
+                    variant="outlined"
+                  />
+                );
+              })()}
+            </Box>
             <Grid container spacing={3} alignItems="center">
               <Grid item xs={12} md={6}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -377,16 +430,23 @@ const AttendancePage: React.FC = () => {
                         {isPunching ? <CircularProgress size={20} /> : 'Punch Out'}
                       </Button>
                     ) : (
-                      <Button
-                        variant="contained"
-                        color="primary"
-                        startIcon={<PlayArrow />}
-                        onClick={handlePunchIn}
-                        disabled={isPunching || !location}
-                        size="large"
+                      <Tooltip 
+                        title={!isWithinWorkingHours() ? 'Punch in is only allowed during working hours (9:00 AM - 6:00 PM)' : ''}
+                        placement="top"
                       >
-                        {isPunching ? <CircularProgress size={20} /> : 'Punch In'}
-                      </Button>
+                        <span>
+                          <Button
+                            variant="contained"
+                            color="primary"
+                            startIcon={<PlayArrow />}
+                            onClick={handlePunchIn}
+                            disabled={isPunching || !location || !isWithinWorkingHours()}
+                            size="large"
+                          >
+                            {isPunching ? <CircularProgress size={20} /> : 'Punch In'}
+                          </Button>
+                        </span>
+                      </Tooltip>
                     )
                   ) : (
                     <Typography variant="body1" color="success.main">
@@ -581,23 +641,35 @@ const AttendancePage: React.FC = () => {
         </Card>
 
         {/* Floating Action Button for Quick Punch */}
-        <Tooltip title="Quick Punch">
-          <Fab
-            color="primary"
-            aria-label="quick punch"
-            sx={{ position: 'fixed', bottom: 16, right: 16 }}
-                            onClick={currentAttendance?.punchOut?.time ? handlePunchIn : handlePunchOut}
-            disabled={isPunching}
-          >
-            {isPunching ? (
-              <CircularProgress size={24} color="inherit" />
-                          ) : currentAttendance?.punchOut?.time ? (
-              <PlayArrow />
-            ) : (
-              <Stop />
-            )}
-          </Fab>
-        </Tooltip>
+        {(() => {
+          const isPunchInMode = Boolean(currentAttendance?.punchOut?.time);
+          const shouldDisable = Boolean(isPunching || (isPunchInMode && !isWithinWorkingHours()));
+          const tooltipTitle = isPunchInMode ? 
+            (!isWithinWorkingHours() ? 'Punch in is only allowed during working hours (9:00 AM - 6:00 PM)' : 'Quick Punch In') : 
+            'Quick Punch Out';
+          
+          return (
+            <Tooltip title={tooltipTitle}>
+              <span>
+                <Fab
+                  color="primary"
+                  aria-label="quick punch"
+                  sx={{ position: 'fixed', bottom: 16, right: 16 }}
+                  onClick={isPunchInMode ? handlePunchIn : handlePunchOut}
+                  disabled={shouldDisable}
+                >
+                  {isPunching ? (
+                    <CircularProgress size={24} color="inherit" />
+                  ) : isPunchInMode ? (
+                    <PlayArrow />
+                  ) : (
+                    <Stop />
+                  )}
+                </Fab>
+              </span>
+            </Tooltip>
+          );
+        })()}
       </Box>
     </LocalizationProvider>
   );

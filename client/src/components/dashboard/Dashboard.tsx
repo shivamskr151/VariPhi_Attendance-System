@@ -9,6 +9,10 @@ import {
   Chip,
   IconButton,
   Tooltip,
+  Alert,
+  Skeleton,
+  Fab,
+  Zoom,
 } from '@mui/material';
 import {
   Schedule,
@@ -20,6 +24,10 @@ import {
   Refresh,
   Work,
   Weekend,
+  Notifications,
+  Dashboard as DashboardIcon,
+  CalendarToday,
+  Warning,
 } from '@mui/icons-material';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
@@ -38,16 +46,37 @@ const Dashboard: React.FC = () => {
   const dispatch = useAppDispatch();
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showRefreshButton, setShowRefreshButton] = useState(false);
   
   const { user, loading: authLoading } = useSelector((state: RootState) => state.auth);
   const { todayAttendance, attendanceHistory, loading: attendanceLoading, error: attendanceError } = useSelector((state: RootState) => state.attendance);
   const { currentEmployee, teamMembers, loading: employeeLoading, error: employeeError } = useSelector((state: RootState) => state.employee);
   const { leaves, loading: leaveLoading } = useSelector((state: RootState) => state.leave);
 
+  // Real-time clock update
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Show refresh button after 5 minutes of inactivity
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowRefreshButton(true);
+    }, 300000); // 5 minutes
+
+    return () => clearTimeout(timer);
+  }, [lastRefresh]);
+
   const refreshDashboard = useCallback(async () => {
     if (!user) return;
     
     try {
+      setIsRefreshing(true);
       await Promise.all([
         dispatch(getTodayAttendance()),
         dispatch(getCurrentEmployee()),
@@ -62,8 +91,11 @@ const Dashboard: React.FC = () => {
         }))
       ]);
       setLastRefresh(new Date());
+      setShowRefreshButton(false);
     } catch (error) {
       console.error('Error refreshing dashboard:', error);
+    } finally {
+      setIsRefreshing(false);
     }
   }, [user, dispatch]);
 
@@ -73,61 +105,29 @@ const Dashboard: React.FC = () => {
     }
   }, [user, refreshDashboard]);
 
-  // Real-time clock update
+  // Auto-refresh every 5 minutes
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
+    if (user) {
+      const interval = setInterval(() => {
+        refreshDashboard();
+      }, 300000); // 5 minutes
 
-    return () => clearInterval(timer);
-  }, []);
-
-  // Auto-refresh dashboard data every 5 minutes
-  useEffect(() => {
-    if (!user) return;
-    
-    const refreshTimer = setInterval(() => {
-      refreshDashboard();
-    }, 5 * 60 * 1000); // 5 minutes
-
-    return () => clearInterval(refreshTimer);
+      return () => clearInterval(interval);
+    }
   }, [user, refreshDashboard]);
 
-  const loading = authLoading || attendanceLoading || employeeLoading || leaveLoading;
-  const error = attendanceError || employeeError;
-
-  if (loading && !user) {
-    return <LoadingSpinner message="Loading dashboard..." />;
-  }
-
-  if (error) {
-    return <ErrorAlert error={error} />;
-  }
-
-  if (!user) {
-    return <ErrorAlert error="User not found" />;
-  }
-
   const getGreeting = () => {
-    const hour = new Date().getHours();
+    const hour = currentTime.getHours();
     if (hour < 12) return 'Good Morning';
     if (hour < 17) return 'Good Afternoon';
     return 'Good Evening';
-  };
-
-  const getCurrentTime = () => {
-    return currentTime.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
   };
 
   const getWorkStatus = () => {
     if (!todayAttendance) return 'Not Started';
     if (todayAttendance.punchIn && !todayAttendance.punchOut) return 'Working';
     if (todayAttendance.punchOut) return 'Completed';
-    return todayAttendance.status;
+    return 'Not Started';
   };
 
   const getWorkStatusColor = (status: string) => {
@@ -135,71 +135,84 @@ const Dashboard: React.FC = () => {
       case 'Working':
         return 'success';
       case 'Completed':
-        return 'info';
+        return 'primary';
       case 'Not Started':
         return 'default';
-      case 'late':
-        return 'warning';
-      case 'absent':
-        return 'error';
       default:
-        return 'primary';
+        return 'default';
     }
   };
 
-  const getTotalWorkHours = () => {
-    if (!attendanceHistory?.length) return 0;
-    return attendanceHistory.reduce((total, record) => total + (record.totalHours || 0), 0);
+  const getWorkStatusIcon = (status: string) => {
+    switch (status) {
+      case 'Working':
+        return <Work color="success" />;
+      case 'Completed':
+        return <CheckCircle color="primary" />;
+      case 'Not Started':
+        return <Schedule color="action" />;
+      default:
+        return <Schedule color="action" />;
+    }
   };
 
-  const getAverageWorkHours = () => {
-    if (!attendanceHistory?.length) return 0;
-    const totalHours = getTotalWorkHours();
-    return totalHours / attendanceHistory.length;
-  };
+  if (authLoading) {
+    return <LoadingSpinner />;
+  }
 
-  const getAttendanceRate = () => {
-    if (!attendanceHistory?.length) return 0;
-    const presentDays = attendanceHistory.filter(record => record.status === 'present').length;
-    return (presentDays / attendanceHistory.length) * 100;
-  };
-
-  const getPendingLeavesCount = () => {
-    return leaves?.filter(leave => leave.status === 'pending').length || 0;
-  };
-
-  const getTeamSize = () => {
-    return teamMembers?.length || 0;
-  };
+  if (!user) {
+    return (
+      <Alert severity="warning">
+        Please log in to view your dashboard.
+      </Alert>
+    );
+  }
 
   return (
-    <Box>
-      {/* Header Section */}
-      <Box mb={3}>
-        <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
-          <Typography variant="h4" component="h1">
+    <Box sx={{ p: 3 }}>
+      {/* Header */}
+      <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
+        <Box>
+          <Typography variant="h4" component="h1" gutterBottom>
             {getGreeting()}, {user.firstName}!
           </Typography>
-          <Box display="flex" alignItems="center" gap={1}>
-            <Typography variant="body2" color="text.secondary">
-              Last updated: {lastRefresh.toLocaleTimeString()}
-            </Typography>
-            <Tooltip title="Refresh Dashboard">
-              <IconButton onClick={refreshDashboard} size="small">
-                <Refresh />
-              </IconButton>
-            </Tooltip>
-          </Box>
+          <Typography variant="body1" color="text.secondary">
+            {currentTime.toLocaleDateString('en-US', { 
+              weekday: 'long', 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
+            })}
+          </Typography>
         </Box>
-        <Typography variant="body1" color="text.secondary" gutterBottom>
-          Welcome to your attendance dashboard. Here's what's happening today.
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          Current time: {getCurrentTime()}
-        </Typography>
+        
+        <Box display="flex" alignItems="center" gap={2}>
+          <Chip
+            icon={getWorkStatusIcon(getWorkStatus())}
+            label={getWorkStatus()}
+            color={getWorkStatusColor(getWorkStatus()) as any}
+            variant="outlined"
+          />
+          <Tooltip title="Refresh Dashboard">
+            <IconButton 
+              onClick={refreshDashboard} 
+              disabled={isRefreshing}
+              color="primary"
+            >
+              <Refresh />
+            </IconButton>
+          </Tooltip>
+        </Box>
       </Box>
 
-      {/* Quick Stats Cards */}
+      {/* Error Display */}
+      {(attendanceError || employeeError) && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {attendanceError || employeeError}
+        </Alert>
+      )}
+
+      {/* Quick Stats */}
       <Grid container spacing={3} mb={3}>
         <Grid item xs={12} sm={6} md={3}>
           <Card>
@@ -207,122 +220,10 @@ const Dashboard: React.FC = () => {
               <Box display="flex" alignItems="center" justifyContent="space-between">
                 <Box>
                   <Typography color="textSecondary" gutterBottom>
-                    Today's Status
-                  </Typography>
-                  <Typography variant="h5" component="h2">
-                    {getWorkStatus()}
-                  </Typography>
-                  {todayAttendance?.status && (
-                    <Chip
-                      label={todayAttendance.status.toUpperCase()}
-                      color={getWorkStatusColor(todayAttendance.status) as any}
-                      size="small"
-                      sx={{ mt: 1 }}
-                    />
-                  )}
-                </Box>
-                <Schedule color="primary" sx={{ fontSize: 40 }} />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography color="textSecondary" gutterBottom>
-                    Work Hours
-                  </Typography>
-                  <Typography variant="h5" component="h2">
-                    {todayAttendance?.totalHours ? `${todayAttendance.totalHours.toFixed(1)}h` : '0h'}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Avg: {getAverageWorkHours().toFixed(1)}h/day
-                  </Typography>
-                </Box>
-                <AccessTime color="primary" sx={{ fontSize: 40 }} />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography color="textSecondary" gutterBottom>
-                    Leave Balance
-                  </Typography>
-                  <Typography variant="h5" component="h2">
-                    {currentEmployee?.leaveBalance ?
-                      Object.values(currentEmployee.leaveBalance).reduce((sum, v) => sum + (typeof v === 'number' ? v : 0), 0)
-                      : 0} days
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {getPendingLeavesCount()} pending requests
-                  </Typography>
-                </Box>
-                <EventNote color="primary" sx={{ fontSize: 40 }} />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography color="textSecondary" gutterBottom>
-                    Team Members
-                  </Typography>
-                  <Typography variant="h5" component="h2">
-                    {getTeamSize()}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {user.role === 'admin' || user.role === 'manager' ? 'Manage team' : 'View team'}
-                  </Typography>
-                </Box>
-                <People color="primary" sx={{ fontSize: 40 }} />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Additional Stats Row */}
-      <Grid container spacing={3} mb={3}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography color="textSecondary" gutterBottom>
-                    Total Hours (30d)
+                    Work Streak
                   </Typography>
                   <Typography variant="h6" component="h3">
-                    {getTotalWorkHours().toFixed(1)}h
-                  </Typography>
-                </Box>
-                <Work color="secondary" sx={{ fontSize: 32 }} />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography color="textSecondary" gutterBottom>
-                    Attendance Rate
-                  </Typography>
-                  <Typography variant="h6" component="h3">
-                    {getAttendanceRate().toFixed(1)}%
+                    {attendanceHistory?.filter(a => a.status === 'present').length || 0} days
                   </Typography>
                 </Box>
                 <TrendingUp color="success" sx={{ fontSize: 32 }} />
@@ -337,13 +238,16 @@ const Dashboard: React.FC = () => {
               <Box display="flex" alignItems="center" justifyContent="space-between">
                 <Box>
                   <Typography color="textSecondary" gutterBottom>
-                    Work Days
+                    This Month
                   </Typography>
                   <Typography variant="h6" component="h3">
-                    {attendanceHistory?.filter(r => r.status === 'present').length || 0}
+                    {attendanceHistory?.filter(a => 
+                      new Date(a.date).getMonth() === new Date().getMonth() && 
+                      a.status === 'present'
+                    ).length || 0} days
                   </Typography>
                 </Box>
-                <CheckCircle color="info" sx={{ fontSize: 32 }} />
+                <CalendarToday color="primary" sx={{ fontSize: 32 }} />
               </Box>
             </CardContent>
           </Card>
@@ -355,13 +259,34 @@ const Dashboard: React.FC = () => {
               <Box display="flex" alignItems="center" justifyContent="space-between">
                 <Box>
                   <Typography color="textSecondary" gutterBottom>
-                    Leave Days
+                    Late Arrivals
                   </Typography>
                   <Typography variant="h6" component="h3">
-                    {leaves?.filter(l => l.status === 'approved').length || 0}
+                    {attendanceHistory?.filter(a => a.status === 'late').length || 0}
                   </Typography>
                 </Box>
-                <Weekend color="warning" sx={{ fontSize: 32 }} />
+                <Warning color="error" sx={{ fontSize: 32 }} />
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+          <Card>
+            <CardContent>
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Box>
+                  <Typography color="textSecondary" gutterBottom>
+                    Attendance Rate
+                  </Typography>
+                  <Typography variant="h6" component="h3">
+                    {attendanceHistory && attendanceHistory.length > 0 
+                      ? `${((attendanceHistory.filter(a => a.status === 'present').length / attendanceHistory.length) * 100).toFixed(1)}%`
+                      : '0%'
+                    }
+                  </Typography>
+                </Box>
+                <CheckCircle color="info" sx={{ fontSize: 32 }} />
               </Box>
             </CardContent>
           </Card>
@@ -402,6 +327,23 @@ const Dashboard: React.FC = () => {
           </Grid>
         </Grid>
       </Grid>
+
+      {/* Floating Refresh Button */}
+      <Zoom in={showRefreshButton}>
+        <Fab
+          color="primary"
+          aria-label="refresh"
+          onClick={refreshDashboard}
+          disabled={isRefreshing}
+          sx={{
+            position: 'fixed',
+            bottom: 16,
+            right: 16,
+          }}
+        >
+          <Refresh />
+        </Fab>
+      </Zoom>
     </Box>
   );
 };
