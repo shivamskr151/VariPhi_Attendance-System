@@ -26,6 +26,8 @@
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.7",
     "socket.io": "^4.7.4",
+    "speakeasy": "^2.0.0",
+    "qrcode": "^1.5.3",
     "uuid": "^9.0.1"
   },
   "devDependencies": {

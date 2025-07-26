@@ -117,7 +117,7 @@ router.post('/send', sendInvitationValidation, authenticateToken, requireAdmin, 
 
   // Send invitation email
   try {
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
     const emailResult = await emailService.sendInvitationEmail(newEmployee, invitationToken, baseUrl);
 
     const message = emailResult.status === 'skipped' 
@@ -174,7 +174,7 @@ router.post('/send-bulk', authenticateToken, requireAdmin, asyncHandler(async (r
     failed: []
   };
 
-  const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
 
   for (const employeeData of employees) {
     try {
@@ -391,7 +391,7 @@ router.post('/resend/:employeeId', authenticateToken, requireAdmin, asyncHandler
 
   // Send invitation email
   try {
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
     const emailResult = await emailService.sendInvitationEmail(employee, invitationToken, baseUrl);
 
     const message = emailResult.status === 'skipped' 

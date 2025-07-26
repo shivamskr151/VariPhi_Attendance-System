@@ -178,18 +178,42 @@ function generateLeaveData(employees) {
 
 // Main seeding function
 async function seedDatabase() {
+  let connectionEstablished = false;
+  
   try {
     console.log('🌱 Starting database seeding...');
     
-    // Connect to MongoDB
-    await mongoose.connect(process.env.MONGODB_URI || process.env.MONGODB_URI_PROD);
-    console.log('✅ Connected to MongoDB');
+    // Check if we're already connected to MongoDB
+    if (mongoose.connection.readyState === 1) {
+      console.log('✅ Using existing MongoDB connection');
+      connectionEstablished = true;
+    } else {
+      console.log('🔌 Establishing MongoDB connection...');
+      
+      // Connect to MongoDB with proper options
+      const mongoUri = process.env.MONGODB_URI || process.env.MONGODB_URI_PROD || 'mongodb://localhost:27017/attendance_system';
+      
+      await mongoose.connect(mongoUri, {
+        serverSelectionTimeoutMS: 30000, // 30 seconds
+        socketTimeoutMS: 45000, // 45 seconds
+        bufferCommands: false
+      });
+      
+      console.log('✅ Connected to MongoDB');
+      connectionEstablished = true;
+    }
     
-    // Clear existing data
+    // Clear existing data with proper timeout handling
     console.log('🧹 Clearing existing data...');
-    await Employee.deleteMany({});
-    await Attendance.deleteMany({});
-    await Leave.deleteMany({});
+    
+    // Use Promise.all with timeout for clearing operations
+    const clearPromises = [
+      Employee.deleteMany({}).maxTimeMS(30000),
+      Attendance.deleteMany({}).maxTimeMS(30000),
+      Leave.deleteMany({}).maxTimeMS(30000)
+    ];
+    
+    await Promise.all(clearPromises);
     console.log('✅ Existing data cleared');
     
     // Create employees
@@ -252,9 +276,13 @@ async function seedDatabase() {
     
   } catch (error) {
     console.error('❌ Error seeding database:', error);
+    throw error; // Re-throw to ensure proper error handling
   } finally {
-    await mongoose.disconnect();
-    console.log('🔌 Disconnected from MongoDB');
+    // Only disconnect if we established the connection ourselves
+    if (connectionEstablished && !mongoose.connection.readyState === 1) {
+      await mongoose.disconnect();
+      console.log('✅ Disconnected from MongoDB');
+    }
   }
 }
 

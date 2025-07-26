@@ -1,0 +1,40 @@
+# Development Dockerfile for the client
+FROM node:18-alpine AS client-development
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
+
+# Create app user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY client/package*.json ./
+
+# Install all dependencies (including dev dependencies) for development and reproducibility
+RUN npm ci
+
+# Copy client source code
+COPY client/ .
+
+# Create cache directory and set permissions
+RUN mkdir -p /app/node_modules/.cache && chown -R nodejs:nodejs /app
+
+# Switch to non-root user
+USER nodejs
+
+# Expose port
+EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3001/ || exit 1
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start the development server
+CMD ["npm", "start", "--", "--host", "0.0.0.0"] 

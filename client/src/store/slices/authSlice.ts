@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { User, LoginForm, ApiResponse } from '../../types';
-import { api } from '../../services/api';
+import { authAPI } from '../../services/api';
 
 interface AuthState {
   user: User | null;
@@ -25,14 +25,14 @@ export const login = createAsyncThunk(
   'auth/login',
   async (credentials: LoginForm, { rejectWithValue }) => {
     try {
-      const response = await api.post<ApiResponse<{
-        employee: User;
-        accessToken: string;
-        refreshToken: string;
-      }>>('/auth/login', credentials);
+      console.log('Login attempt with credentials:', { email: credentials.email, password: '***' });
+      const response = await authAPI.login(credentials);
+      console.log('Login response:', response.data);
       
       return response.data.data;
     } catch (error: any) {
+      console.error('Login error:', error);
+      console.error('Login error response:', error.response?.data);
       return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.message || 'Login failed');
     }
   }
@@ -42,7 +42,7 @@ export const logout = createAsyncThunk(
   'auth/logout',
   async (_, { rejectWithValue }) => {
     try {
-      await api.post('/auth/logout');
+      await authAPI.logout();
       return;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.message || 'Logout failed');
@@ -59,9 +59,7 @@ export const refreshToken = createAsyncThunk(
         throw new Error('No refresh token available');
       }
 
-      const response = await api.post<ApiResponse<{ accessToken: string }>>('/auth/refresh', {
-        refreshToken: auth.refreshToken,
-      });
+      const response = await authAPI.refresh(auth.refreshToken);
       
       return response.data.data?.accessToken || '';
     } catch (error: any) {
@@ -76,10 +74,11 @@ export const checkAuthStatus = createAsyncThunk(
     try {
       const { auth } = getState() as { auth: AuthState };
       if (!auth.accessToken) {
-        throw new Error('No access token available');
+        // If no access token, just return null to indicate not authenticated
+        return null;
       }
 
-      const response = await api.get<ApiResponse<{ employee: User }>>('/auth/me');
+      const response = await authAPI.me();
       return response.data.data?.employee;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.message || 'Authentication check failed');
@@ -91,7 +90,7 @@ export const changePassword = createAsyncThunk(
   'auth/changePassword',
   async (passwords: { currentPassword: string; newPassword: string }, { rejectWithValue }) => {
     try {
-      const response = await api.put<ApiResponse>('/auth/change-password', passwords);
+      const response = await authAPI.changePassword(passwords);
       return response.data.message;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.error?.message || error.response?.data?.message || 'Password change failed');
@@ -196,6 +195,11 @@ const authSlice = createSlice({
         if (action.payload) {
           state.user = action.payload;
           state.isAuthenticated = true;
+          state.error = null;
+        } else {
+          // No user data means not authenticated
+          state.user = null;
+          state.isAuthenticated = false;
           state.error = null;
         }
       })

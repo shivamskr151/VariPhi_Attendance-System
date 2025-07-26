@@ -7,7 +7,7 @@ SERVER_DIR = server
 CLIENT_DIR = client
 NODE_ENV ?= development
 PORT_SERVER ?= 5001
-PORT_CLIENT ?= 3000
+PORT_CLIENT ?= 3001
 
 # Colors for output
 RED = \033[0;31m
@@ -143,13 +143,17 @@ db-reset: ## Reset database (drop and recreate collections)
 .PHONY: db-seed
 db-seed: ## Seed database with sample data
 	@echo "$(BLUE)[INFO]$(NC) Seeding database with sample data..."
-	@cd $(SERVER_DIR) && node seedData.js
+	@echo "$(BLUE)[INFO]$(NC) Checking MongoDB connection..."
+	@mongosh --eval "db.runCommand('ping')" >/dev/null 2>&1 || (echo "$(RED)[ERROR]$(NC) MongoDB is not running. Please start MongoDB first with: make db-start" && exit 1)
+	@cd $(SERVER_DIR) && node seedData.js || (echo "$(RED)[ERROR]$(NC) Seeding failed. Check MongoDB connection and try again." && exit 1)
 
 .PHONY: db-reset-seed
 db-reset-seed: ## Reset and seed database with sample data
 	@echo "$(YELLOW)[WARNING]$(NC) This will reset and seed the database. Are you sure? [y/N]"
 	@read -p "" confirm && [ "$$confirm" = "y" ] || exit 1
 	@echo "$(BLUE)[INFO]$(NC) Resetting and seeding database..."
+	@echo "$(BLUE)[INFO]$(NC) Checking MongoDB connection..."
+	@mongosh --eval "db.runCommand('ping')" >/dev/null 2>&1 || (echo "$(RED)[ERROR]$(NC) MongoDB is not running. Please start MongoDB first with: make db-start" && exit 1)
 	@$(MAKE) db-reset
 	@$(MAKE) db-seed
 	@echo "$(GREEN)[SUCCESS]$(NC) Database reset and seeded successfully"
@@ -363,3 +367,16 @@ health: ## Check application health
 	@echo "$(BLUE)[INFO]$(NC) Checking application health..."
 	@curl -s http://localhost:$(PORT_SERVER)/api/health || echo "$(RED)[ERROR]$(NC) Server not responding"
 	@curl -s http://localhost:$(PORT_CLIENT) >/dev/null && echo "$(GREEN)[SUCCESS]$(NC) Client responding" || echo "$(RED)[ERROR]$(NC) Client not responding" 
+
+# Docker Daemon Check Macro
+DOCKER_DAEMON_CHECK = @docker info >/dev/null 2>&1 || (echo "$(RED)[ERROR]$(NC) Docker is not running. Please start Docker Desktop." && exit 1)
+
+.PHONY: docker-up
+docker-up: ## Start all Docker containers
+	$(DOCKER_DAEMON_CHECK)
+	docker compose up -d
+
+.PHONY: docker-down
+docker-down: ## Stop all Docker containers
+	$(DOCKER_DAEMON_CHECK)
+	docker compose down 

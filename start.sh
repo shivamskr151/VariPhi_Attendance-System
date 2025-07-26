@@ -217,16 +217,20 @@ if ! kill -0 $DEV_PID 2>/dev/null; then
     exit 1
 fi
 
+# Load environment variables for ports with fallbacks
+CLIENT_PORT=${CLIENT_PORT:-3001}
+SERVER_PORT=${SERVER_PORT:-5001}
+
 # Wait for services to be ready
-if wait_for_service "http://localhost:3000" "Frontend"; then
-    print_success "Frontend is running at http://localhost:3000"
+if wait_for_service "http://localhost:$CLIENT_PORT" "Frontend"; then
+    print_success "Frontend is running at http://localhost:$CLIENT_PORT"
 else
     print_error "Frontend failed to start"
     exit 1
 fi
 
-if wait_for_service "http://localhost:5001/api/health" "Backend"; then
-    print_success "Backend is running at http://localhost:5001"
+if wait_for_service "http://localhost:$SERVER_PORT/api/health" "Backend"; then
+    print_success "Backend is running at http://localhost:$SERVER_PORT"
 else
     print_error "Backend failed to start"
     exit 1
@@ -235,9 +239,9 @@ fi
 echo ""
 print_header "🎉 VariPhi Attendance System is Ready!"
 echo ""
-echo -e "${GREEN}✅ Frontend:${NC} http://localhost:3000"
-echo -e "${GREEN}✅ Backend API:${NC} http://localhost:5001"
-echo -e "${GREEN}✅ Health Check:${NC} http://localhost:5001/api/health"
+echo -e "${GREEN}✅ Frontend:${NC} http://localhost:$CLIENT_PORT"
+echo -e "${GREEN}✅ Backend API:${NC} http://localhost:$SERVER_PORT"
+echo -e "${GREEN}✅ Health Check:${NC} http://localhost:$SERVER_PORT/api/health"
 echo ""
 echo -e "${CYAN}📱 You can now access the application in your browser${NC}"
 echo -e "${CYAN}🔧 API documentation and endpoints are available at the backend URL${NC}"

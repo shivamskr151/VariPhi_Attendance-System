@@ -68,10 +68,16 @@ router.post('/login', loginValidation, asyncHandler(async (req, res) => {
   }
 
   const { email, password, twoFactorCode } = req.body;
+  
+  // Debug logging
+  console.log('🔐 Login attempt:', { email, hasPassword: !!password, has2FACode: !!twoFactorCode });
 
   // Find employee by email
   const employee = await Employee.findByEmail(email);
+  console.log('🔍 Employee lookup result:', { found: !!employee, email });
+  
   if (!employee) {
+    console.log('❌ Employee not found for email:', email);
     return res.status(401).json({
       success: false,
       message: 'Invalid credentials'
@@ -88,7 +94,10 @@ router.post('/login', loginValidation, asyncHandler(async (req, res) => {
 
   // Verify password
   const isPasswordValid = await employee.comparePassword(password);
+  console.log('🔑 Password verification:', { isValid: isPasswordValid });
+  
   if (!isPasswordValid) {
+    console.log('❌ Invalid password for email:', email);
     return res.status(401).json({
       success: false,
       message: 'Invalid credentials'
@@ -344,7 +353,7 @@ router.post('/forgot-password', [
   // Send email with reset link
   try {
     const emailService = require('../services/emailService');
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
     const emailResult = await emailService.sendPasswordResetEmail(employee, resetToken, baseUrl);
     
     const message = emailResult.status === 'skipped' 

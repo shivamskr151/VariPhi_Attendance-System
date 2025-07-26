@@ -1,8 +1,16 @@
 import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
+// Debug API configuration
+const apiBaseURL = process.env.REACT_APP_API_URL || `http://localhost:${process.env.REACT_APP_SERVER_PORT || 5001}/api`;
+console.log('API Configuration:', {
+  REACT_APP_API_URL: process.env.REACT_APP_API_URL,
+  REACT_APP_SERVER_PORT: process.env.REACT_APP_SERVER_PORT,
+  baseURL: apiBaseURL
+});
+
 // Create axios instance
 const api: AxiosInstance = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5001/api',
+  baseURL: apiBaseURL,
   timeout: 10000,
 });
 
@@ -44,22 +52,27 @@ api.interceptors.response.use(
     
     // Handle specific error cases
     if (error.response?.status === 401) {
-      const refreshToken = localStorage.getItem('refreshToken');
+      // Don't try to refresh tokens for auth-related endpoints to avoid infinite loops
+      const isAuthEndpoint = error.config?.url?.includes('/auth/');
       
-      if (refreshToken && !error.config._retry) {
-        error.config._retry = true;
+      if (!isAuthEndpoint) {
+        const refreshToken = localStorage.getItem('refreshToken');
         
-        try {
-          const response = await api.post('/auth/refresh', { refreshToken });
-          const newToken = response.data.data?.accessToken;
+        if (refreshToken && !error.config._retry) {
+          error.config._retry = true;
           
-          if (newToken) {
-            localStorage.setItem('accessToken', newToken);
-            error.config.headers.Authorization = `Bearer ${newToken}`;
-            return api(error.config);
+          try {
+            const response = await api.post('/auth/refresh', { refreshToken });
+            const newToken = response.data.data?.accessToken;
+            
+            if (newToken) {
+              localStorage.setItem('accessToken', newToken);
+              error.config.headers.Authorization = `Bearer ${newToken}`;
+              return api(error.config);
+            }
+          } catch (refreshError) {
+            console.error('Token refresh failed:', refreshError);
           }
-        } catch (refreshError) {
-          console.error('Token refresh failed:', refreshError);
         }
       }
       

@@ -34,8 +34,18 @@ const server = createServer(app);
 // Socket.io setup
 const io = new Server(server, {
   cors: {
-    origin: process.env.SOCKET_CORS_ORIGIN || "http://localhost:3000",
-    methods: ["GET", "POST"]
+    origin: [
+      process.env.SOCKET_CORS_ORIGIN || `http://localhost:${process.env.CLIENT_PORT || 3001}`,
+      `http://localhost:${process.env.CLIENT_PORT || 3001}`,
+      `http://127.0.0.1:${process.env.CLIENT_PORT || 3001}`,
+      // Fallback for development
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "http://127.0.0.1:3000",
+      "http://127.0.0.1:3001"
+    ],
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
@@ -51,14 +61,44 @@ const limiter = rateLimit({
 });
 
 // Middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(compression());
 app.use(morgan('combined'));
 app.use(limiter);
-app.use(cors({
-  origin: [process.env.CLIENT_URL, process.env.MOBILE_URL, 'http://localhost:3000'],
-  credentials: true
-}));
+
+// CORS configuration
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      process.env.CLIENT_URL, 
+      process.env.MOBILE_URL, 
+      `http://localhost:${process.env.CLIENT_PORT || 3001}`,
+      `http://127.0.0.1:${process.env.CLIENT_PORT || 3001}`,
+      // Fallback for development
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:3001'
+    ];
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -67,7 +107,13 @@ app.use(trackRequest);
 
 // Database connection
 mongoose.connect(process.env.MONGODB_URI || process.env.MONGODB_URI_PROD)
-.then(() => console.log('Connected to MongoDB'))
+.then(async () => {
+  console.log('Connected to MongoDB');
+  
+  // Initialize database with seed data if empty
+  const { initializeDatabase } = require('./init-config');
+  await initializeDatabase();
+})
 .catch(err => console.error('MongoDB connection error:', err));
 
 // Routes

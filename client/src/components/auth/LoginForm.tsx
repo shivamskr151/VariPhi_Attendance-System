@@ -102,32 +102,22 @@ const LoginForm: React.FC = () => {
     setTwoFactorError(null);
     try {
       if (!twoFactorRequired) {
-        // First attempt: try login with email/password
-        const res = await authAPI.login(formData);
-        if (res.data?.data?.accessToken) {
-          // Success, dispatch login
-          await dispatch(login({ ...formData, twoFactorCode: undefined })).unwrap();
+        // Dispatch login action
+        const result = await dispatch(login({ ...formData, twoFactorCode: undefined })).unwrap();
+        if (result) {
           navigate('/dashboard');
           return;
-        } else if (res.data?.data?.twoFactorRequired || res.data?.twoFactorRequired) {
-          setTwoFactorRequired(true);
-          return;
-        } else {
-          setTwoFactorError(res.data?.message || 'Login failed');
         }
       } else {
         // 2FA required: try login with code
-        const res = await authAPI.login({ ...formData, twoFactorCode });
-        if (res.data?.data?.accessToken) {
-          await dispatch(login({ ...formData, twoFactorCode })).unwrap();
+        const result = await dispatch(login({ ...formData, twoFactorCode })).unwrap();
+        if (result) {
           navigate('/dashboard');
           return;
-        } else {
-          setTwoFactorError(res.data?.message || 'Invalid 2FA code');
         }
       }
     } catch (error: any) {
-      setTwoFactorError(error.response?.data?.message || 'Login failed');
+      setTwoFactorError(error.message || 'Login failed');
     }
   };
 

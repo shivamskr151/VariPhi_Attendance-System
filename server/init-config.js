@@ -1,6 +1,7 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const SystemConfig = require('./models/SystemConfig');
+const Employee = require('./models/Employee');
 
 async function initializeConfig() {
   try {
@@ -69,4 +70,32 @@ async function initializeConfig() {
   }
 }
 
-initializeConfig(); 
+async function initializeDatabase() {
+  try {
+    console.log('🔍 Checking if database needs initialization...');
+    
+    // Check if any employees exist
+    const employeeCount = await Employee.countDocuments();
+    
+    if (employeeCount === 0) {
+      console.log('📦 Database is empty, running seed data...');
+      
+      // Import and run the seed function
+      const { seedDatabase } = require('./seedData');
+      await seedDatabase();
+      
+      console.log('✅ Database initialization completed!');
+      console.log('\n🔑 Default Admin Login:');
+      console.log('   Email: shivam.kumar@variphi.com');
+      console.log('   Password: Variphi@2025');
+      console.log('   Role: Admin');
+    } else {
+      console.log(`✅ Database already has ${employeeCount} employees, skipping initialization.`);
+    }
+  } catch (error) {
+    console.error('❌ Error during database initialization:', error);
+    // Don't throw error, let the server continue
+  }
+}
+
+module.exports = { initializeConfig, initializeDatabase }; 
