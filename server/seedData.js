@@ -46,72 +46,70 @@ const sampleEmployees = [
   }
 ];
 
-// Generate attendance data for the last 30 days
+// Generate attendance data - one entry per employee
 function generateAttendanceData(employees) {
   const attendanceData = [];
   const today = new Date();
   
   employees.forEach(employee => {
-    for (let i = 29; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      
-      // Skip weekends (Saturday = 6, Sunday = 0)
-      const dayOfWeek = date.getDay();
-      if (dayOfWeek === 0 || dayOfWeek === 6) continue;
-      
-      // Randomly skip some days (sick days, personal days)
-      if (Math.random() < 0.05) continue;
-      
-      const punchInHour = 8 + Math.floor(Math.random() * 2); // 8-9 AM
-      const punchInMinute = Math.floor(Math.random() * 60);
-      const punchOutHour = 17 + Math.floor(Math.random() * 2); // 5-6 PM
-      const punchOutMinute = Math.floor(Math.random() * 60);
-      
-      const punchInTime = new Date(date);
-      punchInTime.setHours(punchInHour, punchInMinute, 0, 0);
-      
-      const punchOutTime = new Date(date);
-      punchOutTime.setHours(punchOutHour, punchOutMinute, 0, 0);
-      
-      // Determine status based on punch-in time
-      let status = 'present';
-      if (punchInHour > 9) {
-        status = 'late';
-      }
-      
-      attendanceData.push({
-        employee: employee._id,
-        date: date,
-        punchIn: {
-          time: punchInTime,
-          location: {
-            latitude: 40.7128 + (Math.random() - 0.5) * 0.01,
-            longitude: -74.0060 + (Math.random() - 0.5) * 0.01,
-            address: 'Remote Location',
-            accuracy: 10 + Math.random() * 20
-          },
-          device: ['web', 'mobile', 'tablet'][Math.floor(Math.random() * 3)],
-          ipAddress: `192.168.1.${Math.floor(Math.random() * 255)}`,
-          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        },
-        punchOut: {
-          time: punchOutTime,
-          location: {
-            latitude: 40.7128 + (Math.random() - 0.5) * 0.01,
-            longitude: -74.0060 + (Math.random() - 0.5) * 0.01,
-            address: 'Remote Location',
-            accuracy: 10 + Math.random() * 20
-          },
-          device: ['web', 'mobile', 'tablet'][Math.floor(Math.random() * 3)],
-          ipAddress: `192.168.1.${Math.floor(Math.random() * 255)}`,
-          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        },
-        status: status,
-        isRemote: true,
-        isApproved: true
-      });
+    // Create only one attendance record per employee
+    const date = new Date(today);
+    date.setDate(date.getDate() - 1); // Yesterday's date
+    
+    // Skip weekends (Saturday = 6, Sunday = 0)
+    const dayOfWeek = date.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      date.setDate(date.getDate() - 1); // Move to Friday if weekend
     }
+    
+    const punchInHour = 8 + Math.floor(Math.random() * 2); // 8-9 AM
+    const punchInMinute = Math.floor(Math.random() * 60);
+    const punchOutHour = 17 + Math.floor(Math.random() * 2); // 5-6 PM
+    const punchOutMinute = Math.floor(Math.random() * 60);
+    
+    const punchInTime = new Date(date);
+    punchInTime.setHours(punchInHour, punchInMinute, 0, 0);
+    
+    const punchOutTime = new Date(date);
+    punchOutTime.setHours(punchOutHour, punchOutMinute, 0, 0);
+    
+    // Determine status based on punch-in time
+    let status = 'present';
+    if (punchInHour > 9) {
+      status = 'late';
+    }
+    
+    attendanceData.push({
+      employee: employee._id,
+      date: date,
+      punchIn: {
+        time: punchInTime,
+        location: {
+          latitude: 40.7128 + (Math.random() - 0.5) * 0.01,
+          longitude: -74.0060 + (Math.random() - 0.5) * 0.01,
+          address: 'Remote Location',
+          accuracy: 10 + Math.random() * 20
+        },
+        device: ['web', 'mobile', 'tablet'][Math.floor(Math.random() * 3)],
+        ipAddress: `192.168.1.${Math.floor(Math.random() * 255)}`,
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      },
+      punchOut: {
+        time: punchOutTime,
+        location: {
+          latitude: 40.7128 + (Math.random() - 0.5) * 0.01,
+          longitude: -74.0060 + (Math.random() - 0.5) * 0.01,
+          address: 'Remote Location',
+          accuracy: 10 + Math.random() * 20
+        },
+        device: ['web', 'mobile', 'tablet'][Math.floor(Math.random() * 3)],
+        ipAddress: `192.168.1.${Math.floor(Math.random() * 255)}`,
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      },
+      status: status,
+      isRemote: true,
+      isApproved: true
+    });
   });
   
   return attendanceData;

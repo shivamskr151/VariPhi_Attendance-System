@@ -29,6 +29,23 @@ const documentSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  // GCS fields
+  gcsFileName: {
+    type: String,
+    required: false
+  },
+  gcsPublicUrl: {
+    type: String,
+    required: false
+  },
+  fileSize: {
+    type: Number,
+    required: false
+  },
+  mimeType: {
+    type: String,
+    required: false
+  },
   uploadedAt: {
     type: Date,
     default: Date.now

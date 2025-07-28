@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "glassy-song-449317-a9",
+  "private_key_id": "0cce0d087cca40df836fd87570c7de1ec0328584",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCqeDnT874H4oKQ\nIdz283Rrrx5v0xj4nOYu1e7lY/w9gbs3ngwT6VOs4mA1EpVHAs0XFy/2N8gjPPfA\nCbZ+VVTq5zubtoNHAXRzuZaqQrWMwn111pwcZsjZgxm06YjK7qApwuCFF/oyFXEI\nUEQt3tRNqeCcqnGwjeMfJUjz+Ol5oksfVgZyJvAW8Vhg5y7Zas8nXiErylAkuOeO\n9EWCkCiI+0+047FdwrGf72Xq5+2BYS1zUTb+LUetiMV5j+gC65dd3ZM7qLaJD2CL\nwc9n62yc8aE+21+igZyi5EjNyDfdU+eMR173DK+Xa1FFwGlGtZ90A9nREl+Qttbk\nssXxrdIdAgMBAAECggEACKtYaNyfOC2Z4rnEz+6gfSkjf4qJMqbgt5aL0Zt/Xzhl\nsfB7dZga4t1Ys7JC0wuZLFiyniSxl1sueqlzyrfNEQIv9Z1h+T6MHSYzJkGsvnXA\npXlufdebVMvWRu1OgTWCrIUGNTaQ3ohZHn6zLPBatIAUaxs+8LyShZ8NjKdxZjet\nqfeXn2UMRQIV8C37BRuS1IE6nZ6iPc2CnFpYRHVZoSDfQHgNchQyjjEUdqQmS/zk\nr4fhNa43rsxbMmI+PnigbfJPP3UVvedLvMJNp/vtYup5PGe/tkiK8oseOzzJhRWW\nJRiwosKQI9AV49oN5Xl7Eikd9gLxYDDvKyQH1+/ZCQKBgQDgFwsz6uGtnRsk3Yi3\nJ5XTwwAOrNi9C8tZpI9Pon/SRe0s272VKghQUqednW491EL2xQAF0vNhYOMr6GBc\ntfkqa68nzh9tAUqKZDFQhho22foOVuLFOaqnfdE2b0009ZlGRrQmK+9XxeKaKxEd\nW4mO9ls6zfmIRd/BXrm+RfGyqQKBgQDCvoKAn/BdtP9k/Xu6v8Ji1FG/c2JD1A4i\nedOxAug6rRc8BaFYTUgnZVzUQvTf2DGQDF80QyA+LmGCL48V4XFSmeIU4aCsWmqU\nshzviionFXPAIXU2GaEg2wz1A2bwGMHj26kyeSgDs8qaMLONoIXLMp7WeLgYW+Zs\nvcQb/vGAVQKBgQC3zO7ZZJw6hJQRBsvuPj+780OGxer4FEZ0fm81iDmDROumUY4M\nXO94wnLM6qXTfNh4A1ljbYVGp+tsxirToEaArtZ5ta09AUQcgtWYEIZL2zoorMdP\nsV7yBlalaWFQQOm5JKD6dirYOW0FurFM/Rm08wgdEXjMd1NyDboYANKgEQKBgQC7\nyzbRjmoeExJNcttD5PMwlooWUtAplG3k9RIcmi8TliLXsJ48Jpoz011HGyJEUZjJ\nzgRow2puTA+fmPkkInhDLT2E4WctjStGJNQecl/fvKIYXqtG9kQZCONfyl4Tnewr\nLIHmuErL9y6ireAX7PnYTwI408TDSKvVpNFeJeUA2QKBgHpBFtqwDEgO5DIIU72w\nuEaYleM1yRaKmGO4v9/B4rkjuJy2OTn2U0wkq2j+COKLe/XGKVzO8nRvgBPedL99\ndNk+Z4FjddYXChyWEJQzSggaIZ/pQejvxZu+7saNvhn5dOWiH1IeLOyVjC80ir2P\n7MSw3MSedehVE/atSykp4kKz\n-----END PRIVATE KEY-----\n",
+  "client_email": "variphi@glassy-song-449317-a9.iam.gserviceaccount.com",
+  "client_id": "105878845456201881458",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/variphi%40glassy-song-449317-a9.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+} 

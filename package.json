@@ -27,6 +27,7 @@
     "concurrently": "^8.2.2"
   },
   "dependencies": {
+    "@google-cloud/storage": "^7.16.0",
     "axios": "^1.11.0",
     "mime-types": "^3.0.1",
     "qrcode": "^1.5.4",

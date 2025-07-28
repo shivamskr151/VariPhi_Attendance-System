@@ -10,6 +10,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@google-cloud/storage": "^7.16.0",
     "axios": "^1.10.0",
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",
@@ -20,14 +21,15 @@
     "express-validator": "^7.0.1",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
+    "mime-types": "^3.0.1",
     "moment": "^2.29.4",
     "mongoose": "^8.0.3",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.7",
+    "qrcode": "^1.5.3",
     "socket.io": "^4.7.4",
     "speakeasy": "^2.0.0",
-    "qrcode": "^1.5.3",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
